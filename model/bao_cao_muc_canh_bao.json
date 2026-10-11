@@ -1,0 +1,126 @@
+{
+ "model": "/content/drive/MyDrive/du_doan_tre_han_tabpfn/model/risk_model.joblib",
+ "n_bags": 4,
+ "thresholds": [
+  0.22,
+  0.44
+ ],
+ "test": {
+  "roc_auc": 0.8198,
+  "pr_auc": 0.605,
+  "brier": 0.1154,
+  "ece": 0.0214,
+  "base_rate": 0.1984,
+  "recall_at_top20pct": 0.5716,
+  "precision_at_top20pct": 0.5671
+ },
+ "test_auc_ci95_by_lecturer": [
+  0.8065,
+  0.8303
+ ],
+ "alert_levels": {
+  "Thấp": {
+   "n": 18720,
+   "late_rate": 0.0952,
+   "share": 0.749
+  },
+  "Trung bình": {
+   "n": 3449,
+   "late_rate": 0.3514,
+   "share": 0.138
+  },
+  "Cao": {
+   "n": 2825,
+   "late_rate": 0.6959,
+   "share": 0.113
+  }
+ },
+ "target_check": {
+  "max_late_low": 0.1,
+  "actual_low": 0.0952,
+  "ok_low": true,
+  "min_prec_high": 0.6,
+  "actual_high": 0.6959,
+  "ok_high": true
+ },
+ "mean_pred": 0.177,
+ "late_rate": 0.1984,
+ "segments": {
+  "giảng viên mới (lịch sử < 5 việc)": {
+   "n": 225,
+   "late_rate": 0.067,
+   "mean_pred": 0.056,
+   "auc": 0.67
+  },
+  "giảng viên có lịch sử >= 5 việc": {
+   "n": 24769,
+   "late_rate": 0.2,
+   "mean_pred": 0.178,
+   "auc": 0.82
+  },
+  "mùa cao điểm": {
+   "n": 13148,
+   "late_rate": 0.229,
+   "mean_pred": 0.2,
+   "auc": 0.827
+  },
+  "độ phức tạp cao": {
+   "n": 7103,
+   "late_rate": 0.279,
+   "mean_pred": 0.264,
+   "auc": 0.81
+  }
+ },
+ "calibration_deciles": [
+  {
+   "mean_pred": 0.0245,
+   "late_rate": 0.0372,
+   "n": 2500
+  },
+  {
+   "mean_pred": 0.0355,
+   "late_rate": 0.0432,
+   "n": 2499
+  },
+  {
+   "mean_pred": 0.0472,
+   "late_rate": 0.06,
+   "n": 2499
+  },
+  {
+   "mean_pred": 0.0617,
+   "late_rate": 0.0684,
+   "n": 2500
+  },
+  {
+   "mean_pred": 0.0818,
+   "late_rate": 0.0924,
+   "n": 2499
+  },
+  {
+   "mean_pred": 0.1103,
+   "late_rate": 0.1349,
+   "n": 2499
+  },
+  {
+   "mean_pred": 0.1525,
+   "late_rate": 0.1672,
+   "n": 2500
+  },
+  {
+   "mean_pred": 0.2228,
+   "late_rate": 0.2469,
+   "n": 2499
+  },
+  {
+   "mean_pred": 0.3635,
+   "late_rate": 0.4154,
+   "n": 2499
+  },
+  {
+   "mean_pred": 0.6703,
+   "late_rate": 0.7188,
+   "n": 2500
+  }
+ ]
+}

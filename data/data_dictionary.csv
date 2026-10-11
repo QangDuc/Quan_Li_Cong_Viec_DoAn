@@ -1,0 +1,64 @@
+﻿column,role,description
+task_id,ID/thời gian (không dùng làm đặc trưng),
+lecturer_id,ID/thời gian (không dùng làm đặc trưng),
+faculty,ID/thời gian (không dùng làm đặc trưng),"Mã Khoa (dùng để chia nhóm đánh giá, không phải đặc trưng)"
+assigned_date,ID/thời gian (không dùng làm đặc trưng),
+task_group,Đặc trưng,Nhóm công việc (10 nhóm khảo sát)
+task_type,Đặc trưng,Loại công việc cụ thể
+task_subtype,Đặc trưng,Loại + quy mô (nhỏ/chuẩn/lớn)
+assignment_level,Đặc trưng,Cấp giao: Bộ môn/Khoa/Trường
+assignment_mode,Đặc trưng,Individual/Group
+assignment_channel,Đặc trưng,Kênh giao việc
+priority,Đặc trưng,Mức ưu tiên
+complexity,Đặc trưng,Độ phức tạp
+subtask_count,Đặc trưng,Số đầu việc con
+dependency_count,Đặc trưng,Số đơn vị/bên phụ thuộc
+team_size,Đặc trưng,Số người thực hiện
+is_urgent_assignment,Đặc trưng,1 nếu deadline_pressure > 1.25
+require_external_input,Đặc trưng,Cần dữ liệu/minh chứng từ bên ngoài
+require_approval,Đặc trưng,Cần phê duyệt
+available_days,Đặc trưng,Số ngày từ lúc giao đến hạn gốc
+working_days_available,Đặc trưng,"Số ngày làm việc (trừ cuối tuần, lễ, Tết)"
+holiday_in_window,Đặc trưng,Có nghỉ lễ/Tết trong khoảng thực hiện
+expected_duration_days,Đặc trưng,Thời lượng điển hình của công việc
+deadline_pressure,Đặc trưng,expected_duration / available_days
+estimated_effort_hours,Đặc trưng,Giờ công ước lượng
+converted_workload,Đặc trưng,"Giờ chuẩn quy đổi [giả định], trống nếu không quy đổi cố định"
+academic_period,Đặc trưng,Giai đoạn trong năm học
+semester,Đặc trưng,HK1/HK2/Summer
+academic_week,Đặc trưng,Tuần của năm học (1-52)
+peak_season,Đặc trưng,1 nếu thi/chấm/nộp điểm/bảo vệ
+accreditation_flag,Đặc trưng,1 nếu trong đợt kiểm định
+academic_rank,Đặc trưng,Chức danh
+degree,Đặc trưng,Học vị
+years_experience,Đặc trưng,Thâm niên tại thời điểm giao
+tenure_days,Đặc trưng,Số ngày kể từ khi vào Khoa (nhỏ = giảng viên mới)
+management_role,Đặc trưng,Vai trò quản lý
+department,Đặc trưng,Bộ môn
+teaching_hours_semester,Đặc trưng,Giờ giảng học kỳ/năm
+course_count,Đặc trưng,Số học phần
+student_count,Đặc trưng,Số sinh viên phụ trách
+supervised_student_count,Đặc trưng,Số SV hướng dẫn
+hist_count,Đặc trưng,Số công việc đã xong TRƯỚC ngày giao
+hist_late_rate,Đặc trưng,"Tỉ lệ trễ lịch sử (làm mượt, prior 0.2)"
+hist_avg_delay,Đặc trưng,Số ngày trễ TB của các lần trễ trước đó
+hist_early_rate,Đặc trưng,Tỉ lệ hoàn thành sớm >=2 ngày trước đây
+active_tasks,Đặc trưng,Số việc đang mở lúc giao
+active_high_priority_tasks,Đặc trưng,Số việc đang mở mức Cao/Khẩn cấp
+overdue_open_tasks,Đặc trưng,Số việc đang mở đã quá hạn gốc
+deadlines_next_7d,Đặc trưng,Số hạn gốc rơi vào 7 ngày tới
+deadlines_next_14d,Đặc trưng,Số hạn gốc rơi vào 14 ngày tới
+workload_next_14d,Đặc trưng,Tổng giờ công của việc đến hạn trong 14 ngày
+hist_late_last5,Đặc trưng,Tỉ lệ trễ của 5 việc hoàn thành gần nhất (xu hướng gần đây)
+late_last_30d,Đặc trưng,Số việc hoàn thành TRỄ trong 30 ngày qua (kiệt sức)
+deadline_month_end,Đặc trưng,Hạn chót rơi vào cuối tháng
+is_late,Nhãn,NHÃN CHÍNH = late_vs_original_deadline
+late_vs_original_deadline,Nhãn,Hoàn thành sau hạn gốc
+late_vs_current_deadline,Nhãn,Vẫn trễ sau khi đã gia hạn (nếu được duyệt)
+checkpoint_fraction,Đặc trưng,[dynamic] mốc thời gian 0.25/0.5
+days_elapsed,Đặc trưng,[dynamic] số ngày đã trôi
+days_remaining,Đặc trưng,[dynamic] số ngày còn lại
+progress_pct,Đặc trưng,[dynamic] % tiến độ tại mốc
+expected_progress_pct,Đặc trưng,[dynamic] % tiến độ kỳ vọng tuyến tính
+progress_gap,Đặc trưng,[dynamic] progress - expected
+progress_missing,Đặc trưng,[dynamic] 1 nếu chưa cập nhật tiến độ

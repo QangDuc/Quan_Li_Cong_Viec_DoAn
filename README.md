@@ -1,192 +1,103 @@
-# HUIT Task Risk Prediction & Assignment Optimization Service
-> **Hệ thống Quản lý Công việc và Tối ưu hóa Phân công bằng Học máy tại Khoa CNTT - Trường Đại học Công Thương TP.HCM (HUIT)**  
-> **Mã đề tài:** CNTT-KLCN184
+# Mô hình Học máy Dự đoán Rủi ro Trễ hạn & Tối ưu hóa Phân công
+> **Khóa luận tốt nghiệp Cử nhân ngành CNTT — Năm học 2026–2027**  
+> **Trường Đại học Công Thương TP.HCM (HUIT) — Khoa Công nghệ Thông tin**  
+> **Mã đề tài:** `CNTT-KLCN184`  
+> **Đề tài:** *Xây dựng hệ thống quản lý công việc và tối ưu hóa phân công bằng Học máy tại Khoa Công nghệ Thông tin*  
+> **GVHD:** ThS./TS. Nguyễn Văn Lễ
 
 ---
 
-## 1. Giới thiệu
-Repository này chứa toàn bộ mã nguồn đóng gói **Dịch vụ Học máy (ML API Service)** phục vụ tích hợp trực tiếp vào hệ thống Web Quản lý công việc (ASP.NET Core Backend + SQL Server + React Frontend).
+## 1. Giới thiệu mô hình
+Repository này lưu trữ toàn bộ **mã nguồn, mô hình đã huấn luyện và dữ liệu ma trận đặc trưng** phục vụ module Học máy (Machine Learning) của đồ án:
 
-### Chức năng chính:
-1. **Dự đoán rủi ro trễ hạn (`/api/predict`)**:
-   - Nhận các thuộc tính phân công công việc (loại việc, độ phức tạp, thời hạn, áp lực deadline, lịch sử giảng viên...).
-   - Trả về xác suất trễ hạn $P \in [0, 1]$, phân tầng mức cảnh báo (`Thấp`, `Trung bình`, `Cao`) dựa trên ngưỡng an toàn Wilson 95%.
-   - Cung cấp **Top factors**: Chỉ rõ nguyên nhân làm tăng hoặc giảm rủi ro (Explainability) so với mức điển hình để Trưởng khoa/bộ môn dễ dàng ra quyết định.
-2. **Tối ưu hóa phân công công việc (`/api/recommend-assignee`)**:
-   - Đánh giá tự động một danh sách các giảng viên ứng viên trong bộ môn.
-   - Sắp xếp và đề xuất giảng viên phù hợp nhất (rủi ro trễ hạn thấp nhất, đảm bảo cân bằng khối lượng công việc).
-3. **Tra cứu ma trận tác vụ - nhân sự**:
-   - Tự động liên kết và tra cứu hiệu suất lịch sử theo từng loại việc (`lecturer_task_late_rate`).
+- **Kiến trúc chính:** `TabPFN v2` (Tabular Foundation Model dựa trên Transformer với cơ chế In-Context Learning).
+- **Kỹ thuật mở rộng:** Bagging đa túi (4 túi $\times$ 10.000 dòng ngữ cảnh), kết hợp lấy trung bình xác suất để tăng độ ổn định và giảm phương sai.
+- **Ma trận đặc trưng tác vụ – nhân sự (Task–Personnel Matrix):** Tổng hợp lịch sử tương tác giữa từng giảng viên và từng loại công việc (`lecturer_task_late_rate`, làm mịn Laplace smoothing và cơ chế prior cấp Bộ môn khi cold-start).
+- **Phân tầng mức cảnh báo:** Ngưỡng được xác định tự động trên tập Validation với biên an toàn Wilson 95% (chia thành 3 mức: `Thấp`, `Trung bình`, `Cao`).
+- **Khả năng giải thích (Explainability):** Bóc tách đóng góp của các yếu tố chính làm tăng / giảm rủi ro (**Top factors**) so với mức điển hình.
 
 ---
 
 ## 2. Cấu trúc thư mục
 
 ```
-task_risk_service/
-├── .gitignore
-├── Dockerfile
-├── docker-compose.yml
-├── requirements.txt
+.
 ├── README.md
-├── test_service.py              # Script test nhanh các hàm dự đoán
+├── requirements.txt                   # Thư viện Python cần thiết
+├── train_model.py                     # Script HUẤN LUYỆN và DỰ ĐOÁN (TabPFN)
+├── build_task_personnel_matrix.py     # Xây dựng & bổ sung ma trận tác vụ - nhân sự
+├── clean_data.py                      # Làm sạch dữ liệu và tiền xử lý inference
+├── compare_models.py                  # So sánh TabPFN với CatBoost & Logistic Regression
+├── report_levels.py                   # Tái tạo bảng báo cáo mức cảnh báo rủi ro
 ├── model/
-│   ├── risk_model.joblib        # Model đã huấn luyện (ngữ cảnh + encoder + baseline)
-│   ├── metrics.json             # Báo cáo chỉ số AUC, Brier, ECE, ngưỡng rủi ro
-│   └── train_report.txt         # Nhật ký huấn luyện và kiểm định
-├── data/
-│   └── task_personnel_matrix.csv# Ma trận tác vụ - nhân sự (lookup)
-├── service/
-│   ├── __init__.py
-│   ├── config.py                # Cấu hình cổng, đường dẫn file, ngưỡng
-│   ├── schemas.py               # Pydantic Request/Response DTOs
-│   ├── predictor.py             # Inference engine (TabPFN + Calibrated Proxy + Explainability)
-│   └── main.py                  # FastAPI Application Entrypoint
-└── clients/
-    └── csharp/                  # Thư viện tích hợp sẵn cho ASP.NET Core
-        ├── TaskRiskModels.cs
-        ├── TaskRiskPredictionClient.cs
-        └── README_ASPNET_INTEGRATION.md
+│   ├── risk_model.joblib              # Mô hình đã huấn luyện (ngữ cảnh + bộ mã hóa + baseline)
+│   ├── metrics.json                   # Báo cáo các chỉ số định lượng (AUC, Brier, ECE, phân đoạn)
+│   ├── train_report.txt               # Nhật ký chi tiết của phiên huấn luyện
+│   └── bao_cao_muc_canh_bao.json      # Bảng phân phối và độ chính xác theo 3 mức cảnh báo
+└── data/
+    ├── task_personnel_matrix.csv      # Ma trận tác vụ - nhân sự chi tiết
+    ├── task_personnel_matrix_wide.csv # Bảng ma trận dạng rộng (dùng cho báo cáo/heatmap)
+    └── data_dictionary.csv            # Từ điển dữ liệu mô tả các đặc trưng
 ```
 
 ---
 
-## 3. Hướng dẫn cài đặt & Khởi chạy
+## 3. Cài đặt môi trường
 
-### Cách 1: Khởi chạy trực tiếp bằng Python
 ```bash
-# 1. Tạo môi trường ảo (khuyến nghị)
-python -m venv .venv
-# Trên Windows:
-.venv\Scripts\activate
-# Trên Linux/macOS:
-source .venv/bin/activate
-
-# 2. Cài đặt thư viện
+# Khuyến nghị dùng Python 3.10 trở lên
 pip install -r requirements.txt
-
-# 3. Chạy service FastAPI
-uvicorn service.main:app --host 0.0.0.0 --port 8000 --reload
-```
-Sau khi chạy, mở trình duyệt truy cập:
-- **Swagger UI Interactive Docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
-- **ReDoc Documentation:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
-
-### Cách 2: Khởi chạy bằng Docker Compose
-```bash
-docker compose up -d --build
 ```
 
 ---
 
-## 4. Đặc tả API tích hợp (API Specification)
+## 4. Hướng dẫn sử dụng mô hình
 
-### 4.1. Dự đoán rủi ro phân công đơn lẻ
-- **Endpoint:** `POST /api/predict`
-- **Request Body (JSON):**
-```json
-{
-  "task_id": "T056584",
-  "lecturer_id": "GV226",
-  "faculty": "CNTT",
-  "department": "K05 - Công nghệ phần mềm",
-  "task_type": "Chấm thi cuối kỳ",
-  "priority": "Cao",
-  "complexity": "Cao",
-  "available_days": 5,
-  "estimated_effort_hours": 20,
-  "active_tasks": 14,
-  "overdue_open_tasks": 1,
-  "hist_late_rate": 0.35,
-  "hist_count": 120
-}
-```
-- **Response (JSON):**
-```json
-{
-  "task_id": "T056584",
-  "lecturer_id": "GV226",
-  "risk_probability": 0.875,
-  "risk_level": "Cao",
-  "risk_uncertainty": 0.025,
-  "top_factors": "Tăng rủi ro (so với mức điển hình): số việc đang mở = 14; tỉ lệ trễ lịch sử = 0.35; độ phức tạp = Cao",
-  "notes": null
-}
-```
-
-### 4.2. Gợi ý giảng viên tối ưu nhất để giao việc
-- **Endpoint:** `POST /api/recommend-assignee`
-- **Request Body (JSON):**
-```json
-{
-  "task": {
-    "task_id": "T099881",
-    "task_type": "Hướng dẫn khóa luận/đồ án tốt nghiệp",
-    "priority": "Cao",
-    "complexity": "Cao",
-    "available_days": 10,
-    "estimated_effort_hours": 30
-  },
-  "candidate_lecturers": [
-    { "lecturer_id": "GV001", "lecturer_name": "ThS. Nguyễn Văn A", "department": "CNPM", "active_tasks": 2, "overdue_open_tasks": 0 },
-    { "lecturer_id": "GV002", "lecturer_name": "TS. Trần Thị B", "department": "CNPM", "active_tasks": 15, "overdue_open_tasks": 2 }
-  ]
-}
-```
-- **Response (JSON):**
-```json
-{
-  "task_id": "T099881",
-  "recommended_candidates": [
-    {
-      "rank": 1,
-      "lecturer_id": "GV001",
-      "lecturer_name": "ThS. Nguyễn Văn A",
-      "department": "CNPM",
-      "risk_probability": 0.165,
-      "risk_level": "Thấp",
-      "recommendation_note": "Ứng viên rất phù hợp: rủi ro trễ thấp, khối lượng công việc hiện tại đảm bảo."
-    },
-    {
-      "rank": 2,
-      "lecturer_id": "GV002",
-      "lecturer_name": "TS. Trần Thị B",
-      "department": "CNPM",
-      "risk_probability": 0.892,
-      "risk_level": "Cao",
-      "recommendation_note": "Không khuyến khích: nguy cơ trễ cao do áp lực việc mở hoặc lịch sử hiệu suất."
-    }
-  ]
-}
-```
-
----
-
-## 5. Hướng dẫn tích hợp với ASP.NET Core Backend
-Mã nguồn C# mẫu đã được chuẩn bị sẵn tại thư mục:  
-`clients/csharp/`
-1. Copy file `TaskRiskModels.cs` và `TaskRiskPredictionClient.cs` vào project Web API của bạn.
-2. Đăng ký client trong `Program.cs`:
-   ```csharp
-   builder.Services.AddHttpClient<ITaskRiskPredictionClient, TaskRiskPredictionClient>(client => {
-       client.BaseAddress = new Uri(builder.Configuration["MlService:BaseUrl"] ?? "http://localhost:8000");
-   });
-   ```
-3. Xem hướng dẫn chi tiết tại [README_ASPNET_INTEGRATION.md](clients/csharp/README_ASPNET_INTEGRATION.md).
-
----
-
-## 6. Hướng dẫn đẩy lên GitHub Repository của bạn
-
-Sau khi tạo một repository mới trên tài khoản GitHub của bạn (ví dụ `https://github.com/QangDuc/task-risk-prediction-service.git`), hãy chạy các lệnh sau trong thư mục này:
+### 4.1. Chạy dự đoán trực tiếp từ dòng lệnh (CLI)
+Để dự đoán cho danh sách công việc mới (ví dụ `viec_moi.csv`):
 
 ```bash
-# 1. Thêm remote origin
-git remote add origin https://github.com/QangDuc/<ten-repo-cua-ban>.git
+# 1. Tiền xử lý dữ liệu mới
+python clean_data.py --input viec_moi.csv --output viec_moi_clean.csv --inference
 
-# 2. Đặt nhánh chính là main
-git branch -M main
+# 2. Gắn đặc trưng từ ma trận tác vụ - nhân sự
+python build_task_personnel_matrix.py --data ./data/task_personnel_matrix.csv --enrich viec_moi_clean.csv --out ./data --inference
 
-# 3. Đẩy code lên GitHub
-git push -u origin main
+# 3. Chạy dự đoán xác suất rủi ro kèm giải thích top factors
+python train_model.py predict --model ./model/risk_model.joblib --input ./data/viec_moi_clean_with_matrix.csv --output ket_qua.csv --explain
 ```
+
+### 4.2. Nạp mô hình trong mã nguồn Python (dành cho thành viên tích hợp Backend)
+Thành viên xây dựng backend chỉ cần nạp file `.joblib` và gọi dự đoán:
+
+```python
+import joblib
+import pandas as pd
+
+# 1. Nạp mô hình
+bundle = joblib.load("model/risk_model.joblib")
+
+# Xem ngưỡng cảnh báo
+thresholds = bundle["thresholds"]  # [0.22, 0.44]
+print("Ngưỡng rủi ro:", thresholds)
+
+# Xem các đặc trưng yêu cầu
+print("Danh sách đặc trưng mô hình:", bundle["features"])
+```
+
+---
+
+## 5. Kết quả thực nghiệm trên tập Test (Độc lập theo thời gian)
+
+| Chỉ số đánh giá | Kết quả | Ý nghĩa học thuật |
+|---|:---:|---|
+| **ROC-AUC** | **0.820** | Khả năng phân biệt công việc trễ hạn đạt mức Rất tốt |
+| **PR-AUC** | **0.605** | Độ chính xác trung bình trên tập mất cân bằng nhãn |
+| **Brier Score** | **0.115** | Sai số bình phương trung bình của xác suất dự đoán |
+| **ECE (Expected Calibration Error)** | **0.021** | Độ lệch hiệu chuẩn cực thấp (xác suất dự đoán rất sát thực tế) |
+| **Bootstrap 95% CI** | **[0.807 – 0.830]** | Khoảng tin cậy theo cụm giảng viên |
+
+### Phân tầng mức cảnh báo trên tập Test:
+* **Mức Thấp** ($P \le 0.22$): Chiếm **74.9%** số việc, tỉ lệ trễ thực tế chỉ **9.5%** (đạt mục tiêu $\le 10\%$).
+* **Mức Trung bình** ($0.22 < P < 0.44$): Chiếm **13.8%** số việc, tỉ lệ trễ thực tế **35.1%**.
+* **Mức Cao** ($P \ge 0.44$): Chiếm **11.3%** số việc, tỉ lệ trễ thực tế lên tới **69.6%** (đạt mục tiêu cảnh báo chính xác $\ge 60\%$).
