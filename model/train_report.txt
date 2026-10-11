@@ -1,0 +1,65 @@
+
+======================================================================
+LẦN CHẠY train — 2026-10-10 02:07:42
+======================================================================
+Train 60112 (<= 2026-12-30) | Validation 14905 | Test 24994 (> 2027-08-10, 4960 việc trễ) | 58 đặc trưng | mô hình: TabPFN v2 | thiết bị: cuda | ngữ cảnh tối đa 10,000 dòng x 4 túi (random)
+
+======================================================================
+LẦN CHẠY train — 2026-10-10 02:25:38
+======================================================================
+Train 60112 (<= 2026-12-30) | Validation 14905 | Test 24994 (> 2027-08-10, 4960 việc trễ) | 58 đặc trưng | mô hình: TabPFN v2 | thiết bị: cuda | ngữ cảnh tối đa 10,000 dòng x 4 túi (random)
+Tiếp tục từ điểm lưu: /content/drive/MyDrive/du_doan_tre_han_tabpfn/model/checkpoint
+   [va0] 5 lô vừa tính, 11 lô nạp lại từ điểm lưu
+   [tune] {'n_estimators': 8, 'softmax_temperature': 0.9} -> log-loss validation = 0.3734
+   [te] 28 lô vừa tính, 0 lô nạp lại từ điểm lưu
+
+MÔ HÌNH CHÍNH: TabPFN v2 | params = {'n_estimators': 8, 'softmax_temperature': 0.9} | log-loss validation = 0.3734
+
+=== KẾT QUẢ TRÊN TẬP TEST (theo thời gian) ===
+roc_auc                  0.820
+pr_auc                   0.605
+brier                    0.115
+ece                      0.021
+base_rate                0.198
+recall_at_top20pct       0.572
+precision_at_top20pct    0.567
+AUC 0.820 (khoảng tin cậy 95%, bootstrap theo giảng viên: 0.807-0.830; theo từng dòng: 0.814-0.826)
+
+=== MỨC CẢNH BÁO (ngưỡng [0.22, 0.44] chọn trên validation, có biên an toàn 0.01) ===
+            so_viec  ti_le_tre_thuc_te  ti_le_viec
+level                                             
+Thấp          18720              0.095       0.749
+Trung bình     3449              0.351       0.138
+Cao            2825              0.696       0.113
+   Mục tiêu: nhóm Thấp trễ <= 10% -> thực tế trên test 9.5% (đạt); nhóm Cao chính xác >= 60% -> thực tế 69.6% (đạt)
+
+=== HIỆU CHUẨN THEO DECILE ===
+                                    p      y
+nhom                                        
+(0.010599999999999998, 0.0302]  0.024  0.037
+(0.0302, 0.041]                 0.036  0.043
+(0.041, 0.0538]                 0.047  0.060
+(0.0538, 0.0708]                0.062  0.068
+(0.0708, 0.0943]                0.082  0.092
+(0.0943, 0.128]                 0.110  0.135
+(0.128, 0.18]                   0.153  0.167
+(0.18, 0.276]                   0.223  0.247
+(0.276, 0.476]                  0.364  0.415
+(0.476, 0.976]                  0.670  0.719
+
+=== HIỆU QUẢ THEO NHÓM ===
+                                         n  late_rate  mean_pred    auc
+giảng viên mới (lịch sử < 5 việc)    225.0      0.067      0.056  0.670
+giảng viên có lịch sử >= 5 việc    24769.0      0.200      0.178  0.820
+mùa cao điểm                       13148.0      0.229      0.200  0.827
+độ phức tạp cao                     7103.0      0.279      0.264  0.810
+
+Đã lưu ngữ cảnh + bộ mã hóa + báo cáo vào /content/drive/MyDrive/du_doan_tre_han_tabpfn/model
+
+=== VÍ DỤ CẢNH BÁO ===
+- T056584 (Hoạt động chuyển giao/tư vấn CNTT): có 98% khả năng giảng viên GV274 trễ deadline này -> mức Cao (thực tế: trễ)
+    Tăng rủi ro (so với mức điển hình): số việc đang mở = 19; tỉ lệ trễ lịch sử = 0.377; độ phức tạp = Cao | Giảm rủi ro: số việc đã hoàn thành trước đây = 338; converted_workload = nan
+- T006897 (Chấm thi cuối kỳ): có 97% khả năng giảng viên GV122 trễ deadline này -> mức Cao (thực tế: trễ)
+    Tăng rủi ro (so với mức điển hình): số việc đang mở = 20; tỉ lệ trễ lịch sử = 0.568; độ phức tạp = Cao | Giảm rủi ro: số việc đã hoàn thành trước đây = 322; số ngày trễ TB trước đây = 11.9
+- T023181 (Tham gia hội đồng chuyên môn): có 97% khả năng giảng viên GV006 trễ deadline này -> mức Cao (thực tế: trễ)
+    Tăng rủi ro (so với mức điển hình): số việc đang mở = 16; tỉ lệ trễ lịch sử = 0.492; áp lực deadline = 1.92 | Giảm rủi ro: số việc đã hoàn thành trước đây = 419; số lần GV đã làm loại việc này = 22

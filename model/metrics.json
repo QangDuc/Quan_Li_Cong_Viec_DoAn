@@ -1,0 +1,231 @@
+{
+  "main_model": "tabpfn",
+  "tabpfn_version": "v2",
+  "device": "cuda",
+  "context": {
+    "max_context": 10000,
+    "n_bags": 4,
+    "mode": "random",
+    "n_rows_in_context": 10000
+  },
+  "hyperparams": {
+    "n_estimators": 8,
+    "softmax_temperature": 0.9
+  },
+  "val_logloss": 0.3734,
+  "test": {
+    "roc_auc": 0.8198,
+    "pr_auc": 0.605,
+    "brier": 0.1154,
+    "ece": 0.0214,
+    "base_rate": 0.1984,
+    "recall_at_top20pct": 0.5716,
+    "precision_at_top20pct": 0.5671
+  },
+  "test_auc_ci95": [
+    0.8065,
+    0.8303
+  ],
+  "test_auc_ci95_method": "bootstrap theo cụm giảng viên",
+  "test_auc_ci95_by_row": [
+    0.8137,
+    0.8265
+  ],
+  "threshold_config": {
+    "max_late_low": 0.1,
+    "min_prec_high": 0.6,
+    "safety_margin": 0.01,
+    "min_band": 0.05,
+    "cao_top_pct": null
+  },
+  "thresholds": [
+    0.22,
+    0.44
+  ],
+  "thresholds_from_target_precision": true,
+  "pruned_groups": [],
+  "segments": {
+    "giảng viên mới (lịch sử < 5 việc)": {
+      "n": 225,
+      "late_rate": 0.067,
+      "mean_pred": 0.056,
+      "auc": 0.67
+    },
+    "giảng viên có lịch sử >= 5 việc": {
+      "n": 24769,
+      "late_rate": 0.2,
+      "mean_pred": 0.178,
+      "auc": 0.82
+    },
+    "mùa cao điểm": {
+      "n": 13148,
+      "late_rate": 0.229,
+      "mean_pred": 0.2,
+      "auc": 0.827
+    },
+    "độ phức tạp cao": {
+      "n": 7103,
+      "late_rate": 0.279,
+      "mean_pred": 0.264,
+      "auc": 0.81
+    }
+  },
+  "alert_levels": {
+    "Thấp": {
+      "n": 18720,
+      "late_rate": 0.0952,
+      "share": 0.749
+    },
+    "Trung bình": {
+      "n": 3449,
+      "late_rate": 0.3514,
+      "share": 0.138
+    },
+    "Cao": {
+      "n": 2825,
+      "late_rate": 0.6959,
+      "share": 0.113
+    }
+  },
+  "target_check": {
+    "max_late_low": 0.1,
+    "actual_low": 0.0952,
+    "ok_low": true,
+    "min_prec_high": 0.6,
+    "actual_high": 0.6959,
+    "ok_high": true
+  },
+  "calibration_deciles": [
+    {
+      "mean_pred": 0.0245,
+      "late_rate": 0.0372,
+      "n": 2500
+    },
+    {
+      "mean_pred": 0.0355,
+      "late_rate": 0.0432,
+      "n": 2499
+    },
+    {
+      "mean_pred": 0.0472,
+      "late_rate": 0.06,
+      "n": 2499
+    },
+    {
+      "mean_pred": 0.0617,
+      "late_rate": 0.0684,
+      "n": 2500
+    },
+    {
+      "mean_pred": 0.0818,
+      "late_rate": 0.0924,
+      "n": 2499
+    },
+    {
+      "mean_pred": 0.1103,
+      "late_rate": 0.1349,
+      "n": 2499
+    },
+    {
+      "mean_pred": 0.1525,
+      "late_rate": 0.1672,
+      "n": 2500
+    },
+    {
+      "mean_pred": 0.2228,
+      "late_rate": 0.2469,
+      "n": 2499
+    },
+    {
+      "mean_pred": 0.3635,
+      "late_rate": 0.4154,
+      "n": 2499
+    },
+    {
+      "mean_pred": 0.6703,
+      "late_rate": 0.7188,
+      "n": 2500
+    }
+  ],
+  "n_train": 75017,
+  "n_test": 24994,
+  "meta": {
+    "trained_at": "2026-10-10T03:07:58+00:00",
+    "data_start": "2024-02-12",
+    "data_end": "2027-08-10",
+    "n_rows": 75017,
+    "n_features": 58,
+    "feature_schema": [
+      "task_group",
+      "task_type",
+      "task_subtype",
+      "assignment_level",
+      "assignment_mode",
+      "assignment_channel",
+      "priority",
+      "complexity",
+      "subtask_count",
+      "dependency_count",
+      "team_size",
+      "is_urgent_assignment",
+      "require_external_input",
+      "require_approval",
+      "available_days",
+      "holiday_in_window",
+      "expected_duration_days",
+      "deadline_pressure",
+      "converted_workload",
+      "academic_period",
+      "semester",
+      "academic_week",
+      "peak_season",
+      "accreditation_flag",
+      "academic_rank",
+      "degree",
+      "years_experience",
+      "tenure_days",
+      "management_role",
+      "department",
+      "teaching_hours_semester",
+      "student_count",
+      "supervised_student_count",
+      "hist_count",
+      "hist_late_rate",
+      "hist_avg_delay",
+      "hist_early_rate",
+      "active_tasks",
+      "active_high_priority_tasks",
+      "overdue_open_tasks",
+      "deadlines_next_7d",
+      "deadlines_next_14d",
+      "workload_next_14d",
+      "hist_late_last5",
+      "late_last_30d",
+      "deadline_month_end",
+      "converted_workload_missing",
+      "hist_avg_delay_missing",
+      "hist_early_rate_missing",
+      "hist_late_last5_missing",
+      "is_cold_start",
+      "lecturer_task_count",
+      "lecturer_task_late_rate",
+      "dept_task_late_rate",
+      "task_matrix_source",
+      "lecturer_task_late_lift",
+      "complexity_num",
+      "priority_num"
+    ],
+    "versions": {
+      "python": "3.13.15",
+      "tabpfn": "9.1.0",
+      "torch": "2.11.0+cu130"
+    },
+    "settings": {
+      "n_bags": 4,
+      "max_context": 10000,
+      "context_mode": "random",
+      "tabpfn_version": "v2",
+      "no_tune": true
+    }
+  }
+}

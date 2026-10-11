@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  task-risk-ml-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: huit-task-risk-service:latest
+    container_name: task_risk_ml_api
+    ports:
+      - "8000:8000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+    restart: unless-stopped
