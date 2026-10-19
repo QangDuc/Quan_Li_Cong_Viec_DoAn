@@ -18,6 +18,23 @@ ENV/
 env.bak/
 venv.bak/
 
+# Frontend build & dependencies
+frontend/node_modules/
+frontend/dist/
+
+# Playwright artifacts & screenshots
+.playwright-mcp/
+playwright_*.png
+
+# Local Word / PDF thesis documents & helper scripts
+*.docx
+*.doc
+*.pdf
+~$*
+backend/scripts/generated_diagrams/
+backend/scripts/build_graduation_thesis_docx.py
+backend/scripts/update_docx_thesis.py
+
 # IDE files
 .vscode/
 .idea/

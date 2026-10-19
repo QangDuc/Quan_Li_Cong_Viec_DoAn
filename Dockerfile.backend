@@ -1,0 +1,31 @@
+FROM python:3.10-bullseye
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    gnupg2 \
+    unixodbc-dev \
+    gcc \
+    g++ \
+    && curl -sSL https://packages.microsoft.com/keys/microsoft.asc | apt-key add - \
+    && curl -sSL https://packages.microsoft.com/config/debian/11/prod.list > /etc/apt/sources.list.d/mssql-release.list \
+    && apt-get update \
+    && ACCEPT_EULA=Y apt-get install -y msodbcsql17 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir fastapi uvicorn pydantic sqlalchemy alembic pyodbc pyjwt bcrypt python-multipart openpyxl httpx pytest
+
+COPY features.py ./
+COPY train_model.py ./
+COPY backend/ ./backend/
+COPY model/ ./model/
+COPY data/ ./data/
+
+ENV PYTHONPATH=/app/backend
+ENV PYTHONIOENCODING=utf-8
+EXPOSE 8000
+
+CMD ["sh", "-c", "python -m app.seed && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
