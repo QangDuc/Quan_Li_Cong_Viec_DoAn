@@ -1,0 +1,1241 @@
+{
+ "source": "Suy ra từ ngữ cảnh đã lưu trong model/risk_model.joblib (dữ liệu mô phỏng)",
+ "categories": {
+  "task_group": [
+   "CTĐT",
+   "Cố vấn học tập",
+   "Giảng dạy",
+   "Hành chính",
+   "Hướng dẫn SV",
+   "Hướng nghiệp",
+   "Hội đồng",
+   "Khảo thí",
+   "Nghiên cứu khoa học",
+   "Phục vụ cộng đồng",
+   "Tuyển sinh",
+   "Đoàn thể",
+   "Đào tạo",
+   "Đảm bảo chất lượng"
+  ],
+  "task_type": [
+   "Chuẩn bị bài giảng/cập nhật slide",
+   "Chuẩn bị bài thực hành/lab CNTT",
+   "Chuẩn bị tiếp đoàn đánh giá",
+   "Chấm bài tập/đồ án môn học",
+   "Chấm thi cuối kỳ",
+   "Chấm/phản biện khóa luận",
+   "Coi thi",
+   "Công tác Đảng/đoàn thể/công đoàn",
+   "Cố vấn học tập",
+   "Giảng dạy học phần",
+   "Hoạt động chuyển giao/tư vấn CNTT",
+   "Hướng dẫn khóa luận/đồ án tốt nghiệp",
+   "Hướng dẫn luận văn cao học",
+   "Hướng dẫn đồ án môn học",
+   "Họp lớp/CVHT định kỳ",
+   "Hội thảo/chuyên đề cho cộng đồng",
+   "Kết nối doanh nghiệp/thực tập",
+   "Ngày hội tư vấn tuyển sinh",
+   "Nhập/nộp điểm",
+   "Phản biện/duyệt đề thi",
+   "Ra đề thi",
+   "Rà soát chương trình đào tạo",
+   "Soạn báo cáo/tổng hợp số liệu",
+   "Sửa bài theo phản biện",
+   "Tham gia họp Bộ môn/Khoa",
+   "Tham gia hội đồng chuyên môn",
+   "Thu thập minh chứng kiểm định",
+   "Thực hiện đề tài NCKH",
+   "Tư vấn/hướng nghiệp sinh viên",
+   "Viết bài báo khoa học",
+   "Viết báo cáo tự đánh giá",
+   "Xây dựng học phần mới",
+   "Xây dựng/cập nhật đề cương học phần",
+   "Xử lý cảnh báo học vụ của SV",
+   "Đề xuất/đăng ký đề tài NCKH"
+  ],
+  "task_subtype": [
+   "Chuẩn bị bài giảng/cập nhật slide - quy mô chuẩn",
+   "Chuẩn bị bài giảng/cập nhật slide - quy mô lớn",
+   "Chuẩn bị bài giảng/cập nhật slide - quy mô nhỏ",
+   "Chuẩn bị bài thực hành/lab CNTT - quy mô chuẩn",
+   "Chuẩn bị bài thực hành/lab CNTT - quy mô lớn",
+   "Chuẩn bị bài thực hành/lab CNTT - quy mô nhỏ",
+   "Chuẩn bị tiếp đoàn đánh giá - quy mô chuẩn",
+   "Chuẩn bị tiếp đoàn đánh giá - quy mô lớn",
+   "Chuẩn bị tiếp đoàn đánh giá - quy mô nhỏ",
+   "Chấm bài tập/đồ án môn học - quy mô chuẩn",
+   "Chấm bài tập/đồ án môn học - quy mô lớn",
+   "Chấm bài tập/đồ án môn học - quy mô nhỏ",
+   "Chấm thi cuối kỳ - quy mô chuẩn",
+   "Chấm thi cuối kỳ - quy mô lớn",
+   "Chấm thi cuối kỳ - quy mô nhỏ",
+   "Chấm/phản biện khóa luận - quy mô chuẩn",
+   "Chấm/phản biện khóa luận - quy mô lớn",
+   "Chấm/phản biện khóa luận - quy mô nhỏ",
+   "Coi thi - quy mô chuẩn",
+   "Công tác Đảng/đoàn thể/công đoàn - quy mô chuẩn",
+   "Công tác Đảng/đoàn thể/công đoàn - quy mô lớn",
+   "Công tác Đảng/đoàn thể/công đoàn - quy mô nhỏ",
+   "Cố vấn học tập - quy mô chuẩn",
+   "Cố vấn học tập - quy mô lớn",
+   "Cố vấn học tập - quy mô nhỏ",
+   "Giảng dạy học phần - quy mô chuẩn",
+   "Giảng dạy học phần - quy mô lớn",
+   "Giảng dạy học phần - quy mô nhỏ",
+   "Hoạt động chuyển giao/tư vấn CNTT - quy mô chuẩn",
+   "Hoạt động chuyển giao/tư vấn CNTT - quy mô lớn",
+   "Hoạt động chuyển giao/tư vấn CNTT - quy mô nhỏ",
+   "Hướng dẫn khóa luận/đồ án tốt nghiệp - quy mô chuẩn",
+   "Hướng dẫn khóa luận/đồ án tốt nghiệp - quy mô lớn",
+   "Hướng dẫn khóa luận/đồ án tốt nghiệp - quy mô nhỏ",
+   "Hướng dẫn luận văn cao học - quy mô chuẩn",
+   "Hướng dẫn luận văn cao học - quy mô lớn",
+   "Hướng dẫn luận văn cao học - quy mô nhỏ",
+   "Hướng dẫn đồ án môn học - quy mô chuẩn",
+   "Hướng dẫn đồ án môn học - quy mô lớn",
+   "Hướng dẫn đồ án môn học - quy mô nhỏ",
+   "Họp lớp/CVHT định kỳ - quy mô chuẩn",
+   "Họp lớp/CVHT định kỳ - quy mô lớn",
+   "Hội thảo/chuyên đề cho cộng đồng - quy mô chuẩn",
+   "Hội thảo/chuyên đề cho cộng đồng - quy mô lớn",
+   "Hội thảo/chuyên đề cho cộng đồng - quy mô nhỏ",
+   "Kết nối doanh nghiệp/thực tập - quy mô chuẩn",
+   "Kết nối doanh nghiệp/thực tập - quy mô lớn",
+   "Kết nối doanh nghiệp/thực tập - quy mô nhỏ",
+   "Ngày hội tư vấn tuyển sinh - quy mô chuẩn",
+   "Ngày hội tư vấn tuyển sinh - quy mô lớn",
+   "Ngày hội tư vấn tuyển sinh - quy mô nhỏ",
+   "Nhập/nộp điểm - quy mô chuẩn",
+   "Nhập/nộp điểm - quy mô lớn",
+   "Nhập/nộp điểm - quy mô nhỏ",
+   "Phản biện/duyệt đề thi - quy mô chuẩn",
+   "Phản biện/duyệt đề thi - quy mô lớn",
+   "Phản biện/duyệt đề thi - quy mô nhỏ",
+   "Ra đề thi - quy mô chuẩn",
+   "Ra đề thi - quy mô lớn",
+   "Ra đề thi - quy mô nhỏ",
+   "Rà soát chương trình đào tạo - quy mô chuẩn",
+   "Rà soát chương trình đào tạo - quy mô lớn",
+   "Rà soát chương trình đào tạo - quy mô nhỏ",
+   "Soạn báo cáo/tổng hợp số liệu - quy mô chuẩn",
+   "Soạn báo cáo/tổng hợp số liệu - quy mô lớn",
+   "Soạn báo cáo/tổng hợp số liệu - quy mô nhỏ",
+   "Sửa bài theo phản biện - quy mô chuẩn",
+   "Sửa bài theo phản biện - quy mô lớn",
+   "Sửa bài theo phản biện - quy mô nhỏ",
+   "Tham gia họp Bộ môn/Khoa - quy mô chuẩn",
+   "Tham gia họp Bộ môn/Khoa - quy mô lớn",
+   "Tham gia hội đồng chuyên môn - quy mô chuẩn",
+   "Tham gia hội đồng chuyên môn - quy mô lớn",
+   "Tham gia hội đồng chuyên môn - quy mô nhỏ",
+   "Thu thập minh chứng kiểm định - quy mô chuẩn",
+   "Thu thập minh chứng kiểm định - quy mô lớn",
+   "Thu thập minh chứng kiểm định - quy mô nhỏ",
+   "Thực hiện đề tài NCKH - quy mô chuẩn",
+   "Thực hiện đề tài NCKH - quy mô lớn",
+   "Thực hiện đề tài NCKH - quy mô nhỏ",
+   "Tư vấn/hướng nghiệp sinh viên - quy mô chuẩn",
+   "Tư vấn/hướng nghiệp sinh viên - quy mô lớn",
+   "Tư vấn/hướng nghiệp sinh viên - quy mô nhỏ",
+   "Viết bài báo khoa học - quy mô chuẩn",
+   "Viết bài báo khoa học - quy mô lớn",
+   "Viết bài báo khoa học - quy mô nhỏ",
+   "Viết báo cáo tự đánh giá - quy mô chuẩn",
+   "Viết báo cáo tự đánh giá - quy mô lớn",
+   "Viết báo cáo tự đánh giá - quy mô nhỏ",
+   "Xây dựng học phần mới - quy mô chuẩn",
+   "Xây dựng học phần mới - quy mô lớn",
+   "Xây dựng học phần mới - quy mô nhỏ",
+   "Xây dựng/cập nhật đề cương học phần - quy mô chuẩn",
+   "Xây dựng/cập nhật đề cương học phần - quy mô lớn",
+   "Xây dựng/cập nhật đề cương học phần - quy mô nhỏ",
+   "Xử lý cảnh báo học vụ của SV - quy mô chuẩn",
+   "Xử lý cảnh báo học vụ của SV - quy mô lớn",
+   "Xử lý cảnh báo học vụ của SV - quy mô nhỏ",
+   "Đề xuất/đăng ký đề tài NCKH - quy mô chuẩn",
+   "Đề xuất/đăng ký đề tài NCKH - quy mô lớn",
+   "Đề xuất/đăng ký đề tài NCKH - quy mô nhỏ"
+  ],
+  "assignment_level": [
+   "Bộ môn",
+   "Khoa",
+   "Trường"
+  ],
+  "assignment_mode": [
+   "Group",
+   "Individual"
+  ],
+  "assignment_channel": [
+   "Email",
+   "Hệ thống",
+   "Họp",
+   "Trực tiếp",
+   "Zalo/Teams"
+  ],
+  "priority": [
+   "Cao",
+   "Khẩn cấp",
+   "Thấp",
+   "Trung bình"
+  ],
+  "complexity": [
+   "Cao",
+   "Thấp",
+   "Trung bình"
+  ],
+  "academic_period": [
+   "final_exam",
+   "grade_submission",
+   "graduation_project",
+   "midterm",
+   "normal_teaching",
+   "semester_start",
+   "summer"
+  ],
+  "semester": [
+   "HK1",
+   "HK2",
+   "Summer"
+  ],
+  "academic_rank": [
+   "Giảng viên",
+   "Giảng viên chính",
+   "Phó giáo sư"
+  ],
+  "degree": [
+   "Thạc sĩ",
+   "Tiến sĩ"
+  ],
+  "management_role": [
+   "Không",
+   "Phó trưởng bộ môn",
+   "Phó trưởng khoa",
+   "Trưởng bộ môn"
+  ],
+  "department": [
+   "K01 - Công nghệ phần mềm",
+   "K01 - Hệ thống thông tin",
+   "K01 - Khoa học máy tính",
+   "K01 - Mạng máy tính",
+   "K02 - Công nghệ phần mềm",
+   "K02 - Hệ thống thông tin",
+   "K02 - Khoa học máy tính",
+   "K02 - Mạng máy tính",
+   "K03 - Công nghệ phần mềm",
+   "K03 - Hệ thống thông tin",
+   "K03 - Khoa học máy tính",
+   "K03 - Mạng máy tính",
+   "K04 - Công nghệ phần mềm",
+   "K04 - Hệ thống thông tin",
+   "K04 - Khoa học máy tính",
+   "K04 - Mạng máy tính",
+   "K05 - Công nghệ phần mềm",
+   "K05 - Hệ thống thông tin",
+   "K05 - Khoa học máy tính",
+   "K05 - Mạng máy tính",
+   "K06 - Công nghệ phần mềm",
+   "K06 - Hệ thống thông tin",
+   "K06 - Khoa học máy tính",
+   "K06 - Mạng máy tính"
+  ],
+  "task_matrix_source": [
+   "department",
+   "global",
+   "personal"
+  ]
+ },
+ "task_types": [
+  {
+   "name": "Chuẩn bị bài giảng/cập nhật slide",
+   "task_group": "Giảng dạy",
+   "scales": {
+    "quy mô nhỏ": {
+     "expected_duration_days": 2.03,
+     "converted_workload": 4.74,
+     "n": 186
+    },
+    "quy mô chuẩn": {
+     "expected_duration_days": 3.11,
+     "converted_workload": 5.22,
+     "n": 466
+    },
+    "quy mô lớn": {
+     "expected_duration_days": 5.68,
+     "converted_workload": 5.39,
+     "n": 923
+    }
+   },
+   "default_complexity": "Trung bình",
+   "default_subtask_count": 5,
+   "default_dependency_count": 1,
+   "has_conversion": true
+  },
+  {
+   "name": "Chuẩn bị bài thực hành/lab CNTT",
+   "task_group": "Giảng dạy",
+   "scales": {
+    "quy mô nhỏ": {
+     "expected_duration_days": 2.03,
+     "converted_workload": 7.1,
+     "n": 294
+    },
+    "quy mô chuẩn": {
+     "expected_duration_days": 3.15,
+     "converted_workload": 6.73,
+     "n": 854
+    },
+    "quy mô lớn": {
+     "expected_duration_days": 5.04,
+     "converted_workload": 7.32,
+     "n": 952
+    }
+   },
+   "default_complexity": "Trung bình",
+   "default_subtask_count": 6,
+   "default_dependency_count": 2,
+   "has_conversion": true
+  },
+  {
+   "name": "Chuẩn bị tiếp đoàn đánh giá",
+   "task_group": "Đảm bảo chất lượng",
+   "scales": {
+    "quy mô nhỏ": {
+     "expected_duration_days": 13.79,
+     "converted_workload": 15.18,
+     "n": 48
+    },
+    "quy mô chuẩn": {
+     "expected_duration_days": 21.94,
+     "converted_workload": 13.61,
+     "n": 168
+    },
+    "quy mô lớn": {
+     "expected_duration_days": 39.1,
+     "converted_workload": 13.95,
+     "n": 395
+    }
+   },
+   "default_complexity": "Cao",
+   "default_subtask_count": 7,
+   "default_dependency_count": 3,
+   "has_conversion": true
+  },
+  {
+   "name": "Chấm bài tập/đồ án môn học",
+   "task_group": "Giảng dạy",
+   "scales": {
+    "quy mô nhỏ": {
+     "expected_duration_days": 2.59,
+     "converted_workload": 6.71,
+     "n": 317
+    },
+    "quy mô chuẩn": {
+     "expected_duration_days": 4.18,
+     "converted_workload": 6.94,
+     "n": 616
+    },
+    "quy mô lớn": {
+     "expected_duration_days": 6.54,
+     "converted_workload": 6.93,
+     "n": 611
+    }
+   },
+   "default_complexity": "Trung bình",
+   "default_subtask_count": 5,
+   "default_dependency_count": 1,
+   "has_conversion": true
+  },
+  {
+   "name": "Chấm thi cuối kỳ",
+   "task_group": "Khảo thí",
+   "scales": {
+    "quy mô nhỏ": {
+     "expected_duration_days": 3.4,
+     "converted_workload": 8.65,
+     "n": 265
+    },
+    "quy mô chuẩn": {
+     "expected_duration_days": 5.22,
+     "converted_workload": 8.82,
+     "n": 771
+    },
+    "quy mô lớn": {
+     "expected_duration_days": 8.88,
+     "converted_workload": 9.18,
+     "n": 1289
+    }
+   },
+   "default_complexity": "Trung bình",
+   "default_subtask_count": 6,
+   "default_dependency_count": 2,
+   "has_conversion": true
+  },
+  {
+   "name": "Chấm/phản biện khóa luận",
+   "task_group": "Khảo thí",
+   "scales": {
+    "quy mô nhỏ": {
+     "expected_duration_days": 3.62,
+     "converted_workload": 3.33,
+     "n": 40
+    },
+    "quy mô chuẩn": {
+     "expected_duration_days": 5.28,
+     "converted_workload": 3.23,
+     "n": 165
+    },
+    "quy mô lớn": {
+     "expected_duration_days": 7.78,
+     "converted_workload": 3.3,
+     "n": 158
+    }
+   },
+   "default_complexity": "Cao",
+   "default_subtask_count": 7,
+   "default_dependency_count": 2,
+   "has_conversion": true
+  },
+  {
+   "name": "Coi thi",
+   "task_group": "Khảo thí",
+   "scales": {
+    "quy mô chuẩn": {
+     "expected_duration_days": 0.85,
+     "converted_workload": 1.21,
+     "n": 3010
+    }
+   },
+   "default_complexity": "Thấp",
+   "default_subtask_count": 2,
+   "default_dependency_count": 1,
+   "has_conversion": true
+  },
+  {
+   "name": "Công tác Đảng/đoàn thể/công đoàn",
+   "task_group": "Đoàn thể",
+   "scales": {
+    "quy mô nhỏ": {
+     "expected_duration_days": 1.97,
+     "converted_workload": 2.36,
+     "n": 151
+    },
+    "quy mô chuẩn": {
+     "expected_duration_days": 3.2,
+     "converted_workload": 2.18,
+     "n": 325
+    },
+    "quy mô lớn": {
+     "expected_duration_days": 5.38,
+     "converted_workload": 2.01,
+     "n": 552
+    }
+   },
+   "default_complexity": "Thấp",
+   "default_subtask_count": 3,
+   "default_dependency_count": 2,
+   "has_conversion": true
+  },
+  {
+   "name": "Cố vấn học tập",
+   "task_group": "Cố vấn học tập",
+   "scales": {
+    "quy mô nhỏ": {
+     "expected_duration_days": 132.65,
+     "converted_workload": 13.36,
+     "n": 20
+    },
+    "quy mô chuẩn": {
+     "expected_duration_days": 187.21,
+     "converted_workload": 14.48,
+     "n": 230
+    },
+    "quy mô lớn": {
+     "expected_duration_days": 250.73,
+     "converted_workload": 17.52,
+     "n": 27
+    }
+   },
+   "default_complexity": "Trung bình",
+   "default_subtask_count": 5,
+   "default_dependency_count": 1,
+   "has_conversion": true
+  },
+  {
+   "name": "Giảng dạy học phần",
+   "task_group": "Giảng dạy",
+   "scales": {
+    "quy mô nhỏ": {
+     "expected_duration_days": 74.96,
+     "converted_workload": 39.51,
+     "n": 207
+    },
+    "quy mô chuẩn": {
+     "expected_duration_days": 106.09,
+     "converted_workload": 44.28,
+     "n": 700
+    },
+    "quy mô lớn": {
+     "expected_duration_days": 142.43,
+     "converted_workload": 55.22,
+     "n": 56
+    }
+   },
+   "default_complexity": "Trung bình",
+   "default_subtask_count": 5,
+   "default_dependency_count": 1,
+   "has_conversion": true
+  },
+  {
+   "name": "Hoạt động chuyển giao/tư vấn CNTT",
+   "task_group": "Phục vụ cộng đồng",
+   "scales": {
+    "quy mô nhỏ": {
+     "expected_duration_days": 34.8,
+     "converted_workload": null,
+     "n": 29
+    },
+    "quy mô chuẩn": {
+     "expected_duration_days": 65.21,
+     "converted_workload": null,
+     "n": 88
+    },
+    "quy mô lớn": {
+     "expected_duration_days": 117.06,
+     "converted_workload": null,
+     "n": 174
+    }
+   },
+   "default_complexity": "Cao",
+   "default_subtask_count": 8,
+   "default_dependency_count": 3,
+   "has_conversion": false
+  },
+  {
+   "name": "Hướng dẫn khóa luận/đồ án tốt nghiệp",
+   "task_group": "Hướng dẫn SV",
+   "scales": {
+    "quy mô nhỏ": {
+     "expected_duration_days": 86.1,
+     "converted_workload": 24.56,
+     "n": 64
+    },
+    "quy mô chuẩn": {
+     "expected_duration_days": 128.45,
+     "converted_workload": 25.51,
+     "n": 531
+    },
+    "quy mô lớn": {
+     "expected_duration_days": 174.21,
+     "converted_workload": 27.4,
+     "n": 244
+    }
+   },
+   "default_complexity": "Cao",
+   "default_subtask_count": 8,
+   "default_dependency_count": 3,
+   "has_conversion": true
+  },
+  {
+   "name": "Hướng dẫn luận văn cao học",
+   "task_group": "Hướng dẫn SV",
+   "scales": {
+    "quy mô nhỏ": {
+     "expected_duration_days": 121.51,
+     "converted_workload": 35.49,
+     "n": 8
+    },
+    "quy mô chuẩn": {
+     "expected_duration_days": 207.63,
+     "converted_workload": 35.46,
+     "n": 65
+    },
+    "quy mô lớn": {
+     "expected_duration_days": 298.78,
+     "converted_workload": 33.17,
+     "n": 88
+    }
+   },
+   "default_complexity": "Cao",
+   "default_subtask_count": 8,
+   "default_dependency_count": 2,
+   "has_conversion": true
+  },
+  {
+   "name": "Hướng dẫn đồ án môn học",
+   "task_group": "Hướng dẫn SV",
+   "scales": {
+    "quy mô nhỏ": {
+     "expected_duration_days": 57.91,
+     "converted_workload": 5.44,
+     "n": 226
+    },
+    "quy mô chuẩn": {
+     "expected_duration_days": 89.62,
+     "converted_workload": 6.18,
+     "n": 465
+    },
+    "quy mô lớn": {
+     "expected_duration_days": 126.08,
+     "converted_workload": 7.68,
+     "n": 32
+    }
+   },
+   "default_complexity": "Trung bình",
+   "default_subtask_count": 5,
+   "default_dependency_count": 1,
+   "has_conversion": true
+  },
+  {
+   "name": "Họp lớp/CVHT định kỳ",
+   "task_group": "Cố vấn học tập",
+   "scales": {
+    "quy mô chuẩn": {
+     "expected_duration_days": 1.04,
+     "converted_workload": 1.2,
+     "n": 453
+    },
+    "quy mô lớn": {
+     "expected_duration_days": 1.42,
+     "converted_workload": 1.29,
+     "n": 142
+    }
+   },
+   "default_complexity": "Thấp",
+   "default_subtask_count": 2,
+   "default_dependency_count": 0,
+   "has_conversion": true
+  },
+  {
+   "name": "Hội thảo/chuyên đề cho cộng đồng",
+   "task_group": "Phục vụ cộng đồng",
+   "scales": {
+    "quy mô nhỏ": {
+     "expected_duration_days": 6.1,
+     "converted_workload": 6.0,
+     "n": 23
+    },
+    "quy mô chuẩn": {
+     "expected_duration_days": 11.09,
+     "converted_workload": 7.25,
+     "n": 124
+    },
+    "quy mô lớn": {
+     "expected_duration_days": 19.07,
+     "converted_workload": 7.42,
+     "n": 184
+    }
+   },
+   "default_complexity": "Trung bình",
+   "default_subtask_count": 6,
+   "default_dependency_count": 2,
+   "has_conversion": true
+  },
+  {
+   "name": "Kết nối doanh nghiệp/thực tập",
+   "task_group": "Hướng nghiệp",
+   "scales": {
+    "quy mô nhỏ": {
+     "expected_duration_days": 8.64,
+     "converted_workload": 7.05,
+     "n": 189
+    },
+    "quy mô chuẩn": {
+     "expected_duration_days": 14.81,
+     "converted_workload": 7.44,
+     "n": 374
+    },
+    "quy mô lớn": {
+     "expected_duration_days": 22.5,
+     "converted_workload": 7.74,
+     "n": 213
+    }
+   },
+   "default_complexity": "Trung bình",
+   "default_subtask_count": 6,
+   "default_dependency_count": 2,
+   "has_conversion": true
+  },
+  {
+   "name": "Ngày hội tư vấn tuyển sinh",
+   "task_group": "Tuyển sinh",
+   "scales": {
+    "quy mô nhỏ": {
+     "expected_duration_days": 1.9,
+     "converted_workload": 5.25,
+     "n": 292
+    },
+    "quy mô chuẩn": {
+     "expected_duration_days": 3.04,
+     "converted_workload": 5.62,
+     "n": 603
+    },
+    "quy mô lớn": {
+     "expected_duration_days": 4.63,
+     "converted_workload": 5.9,
+     "n": 424
+    }
+   },
+   "default_complexity": "Thấp",
+   "default_subtask_count": 4,
+   "default_dependency_count": 2,
+   "has_conversion": true
+  },
+  {
+   "name": "Nhập/nộp điểm",
+   "task_group": "Đào tạo",
+   "scales": {
+    "quy mô nhỏ": {
+     "expected_duration_days": 1.4,
+     "converted_workload": 0.64,
+     "n": 126
+    },
+    "quy mô chuẩn": {
+     "expected_duration_days": 2.08,
+     "converted_workload": 0.63,
+     "n": 382
+    },
+    "quy mô lớn": {
+     "expected_duration_days": 3.12,
+     "converted_workload": 0.64,
+     "n": 292
+    }
+   },
+   "default_complexity": "Thấp",
+   "default_subtask_count": 3,
+   "default_dependency_count": 0,
+   "has_conversion": true
+  },
+  {
+   "name": "Phản biện/duyệt đề thi",
+   "task_group": "Khảo thí",
+   "scales": {
+    "quy mô nhỏ": {
+     "expected_duration_days": 1.94,
+     "converted_workload": 1.38,
+     "n": 675
+    },
+    "quy mô chuẩn": {
+     "expected_duration_days": 3.14,
+     "converted_workload": 1.39,
+     "n": 1698
+    },
+    "quy mô lớn": {
+     "expected_duration_days": 4.79,
+     "converted_workload": 1.48,
+     "n": 1341
+    }
+   },
+   "default_complexity": "Trung bình",
+   "default_subtask_count": 5,
+   "default_dependency_count": 2,
+   "has_conversion": true
+  },
+  {
+   "name": "Ra đề thi",
+   "task_group": "Khảo thí",
+   "scales": {
+    "quy mô nhỏ": {
+     "expected_duration_days": 3.48,
+     "converted_workload": 2.9,
+     "n": 228
+    },
+    "quy mô chuẩn": {
+     "expected_duration_days": 5.39,
+     "converted_workload": 3.05,
+     "n": 864
+    },
+    "quy mô lớn": {
+     "expected_duration_days": 8.89,
+     "converted_workload": 3.14,
+     "n": 1334
+    }
+   },
+   "default_complexity": "Trung bình",
+   "default_subtask_count": 6,
+   "default_dependency_count": 2,
+   "has_conversion": true
+  },
+  {
+   "name": "Rà soát chương trình đào tạo",
+   "task_group": "CTĐT",
+   "scales": {
+    "quy mô nhỏ": {
+     "expected_duration_days": 58.42,
+     "converted_workload": 25.58,
+     "n": 49
+    },
+    "quy mô chuẩn": {
+     "expected_duration_days": 101.93,
+     "converted_workload": 32.63,
+     "n": 173
+    },
+    "quy mô lớn": {
+     "expected_duration_days": 138.49,
+     "converted_workload": 29.47,
+     "n": 212
+    }
+   },
+   "default_complexity": "Cao",
+   "default_subtask_count": 7,
+   "default_dependency_count": 3,
+   "has_conversion": true
+  },
+  {
+   "name": "Soạn báo cáo/tổng hợp số liệu",
+   "task_group": "Hành chính",
+   "scales": {
+    "quy mô nhỏ": {
+     "expected_duration_days": 3.19,
+     "converted_workload": 5.54,
+     "n": 279
+    },
+    "quy mô chuẩn": {
+     "expected_duration_days": 5.29,
+     "converted_workload": 5.57,
+     "n": 524
+    },
+    "quy mô lớn": {
+     "expected_duration_days": 8.72,
+     "converted_workload": 5.54,
+     "n": 713
+    }
+   },
+   "default_complexity": "Trung bình",
+   "default_subtask_count": 6,
+   "default_dependency_count": 2,
+   "has_conversion": true
+  },
+  {
+   "name": "Sửa bài theo phản biện",
+   "task_group": "Nghiên cứu khoa học",
+   "scales": {
+    "quy mô nhỏ": {
+     "expected_duration_days": 9.2,
+     "converted_workload": null,
+     "n": 64
+    },
+    "quy mô chuẩn": {
+     "expected_duration_days": 15.11,
+     "converted_workload": null,
+     "n": 155
+    },
+    "quy mô lớn": {
+     "expected_duration_days": 27.83,
+     "converted_workload": null,
+     "n": 432
+    }
+   },
+   "default_complexity": "Cao",
+   "default_subtask_count": 7,
+   "default_dependency_count": 3,
+   "has_conversion": false
+  },
+  {
+   "name": "Tham gia họp Bộ môn/Khoa",
+   "task_group": "Hành chính",
+   "scales": {
+    "quy mô chuẩn": {
+     "expected_duration_days": 1.03,
+     "converted_workload": 1.23,
+     "n": 1527
+    },
+    "quy mô lớn": {
+     "expected_duration_days": 1.42,
+     "converted_workload": 1.3,
+     "n": 533
+    }
+   },
+   "default_complexity": "Thấp",
+   "default_subtask_count": 3,
+   "default_dependency_count": 1,
+   "has_conversion": true
+  },
+  {
+   "name": "Tham gia hội đồng chuyên môn",
+   "task_group": "Hội đồng",
+   "scales": {
+    "quy mô nhỏ": {
+     "expected_duration_days": 2.0,
+     "converted_workload": 2.92,
+     "n": 345
+    },
+    "quy mô chuẩn": {
+     "expected_duration_days": 3.17,
+     "converted_workload": 3.11,
+     "n": 859
+    },
+    "quy mô lớn": {
+     "expected_duration_days": 5.99,
+     "converted_workload": 3.18,
+     "n": 1745
+    }
+   },
+   "default_complexity": "Trung bình",
+   "default_subtask_count": 6,
+   "default_dependency_count": 3,
+   "has_conversion": true
+  },
+  {
+   "name": "Thu thập minh chứng kiểm định",
+   "task_group": "Đảm bảo chất lượng",
+   "scales": {
+    "quy mô nhỏ": {
+     "expected_duration_days": 18.71,
+     "converted_workload": 20.33,
+     "n": 124
+    },
+    "quy mô chuẩn": {
+     "expected_duration_days": 32.41,
+     "converted_workload": 20.41,
+     "n": 330
+    },
+    "quy mô lớn": {
+     "expected_duration_days": 58.15,
+     "converted_workload": 22.17,
+     "n": 745
+    }
+   },
+   "default_complexity": "Cao",
+   "default_subtask_count": 7,
+   "default_dependency_count": 3,
+   "has_conversion": true
+  },
+  {
+   "name": "Thực hiện đề tài NCKH",
+   "task_group": "Nghiên cứu khoa học",
+   "scales": {
+    "quy mô nhỏ": {
+     "expected_duration_days": 177.05,
+     "converted_workload": null,
+     "n": 88
+    },
+    "quy mô chuẩn": {
+     "expected_duration_days": 290.22,
+     "converted_workload": null,
+     "n": 299
+    },
+    "quy mô lớn": {
+     "expected_duration_days": 488.45,
+     "converted_workload": null,
+     "n": 584
+    }
+   },
+   "default_complexity": "Cao",
+   "default_subtask_count": 8,
+   "default_dependency_count": 3,
+   "has_conversion": false
+  },
+  {
+   "name": "Tư vấn/hướng nghiệp sinh viên",
+   "task_group": "Hướng nghiệp",
+   "scales": {
+    "quy mô nhỏ": {
+     "expected_duration_days": 3.08,
+     "converted_workload": 3.95,
+     "n": 121
+    },
+    "quy mô chuẩn": {
+     "expected_duration_days": 5.29,
+     "converted_workload": 3.95,
+     "n": 231
+    },
+    "quy mô lớn": {
+     "expected_duration_days": 8.42,
+     "converted_workload": 3.97,
+     "n": 344
+    }
+   },
+   "default_complexity": "Trung bình",
+   "default_subtask_count": 5,
+   "default_dependency_count": 2,
+   "has_conversion": true
+  },
+  {
+   "name": "Viết bài báo khoa học",
+   "task_group": "Nghiên cứu khoa học",
+   "scales": {
+    "quy mô nhỏ": {
+     "expected_duration_days": 39.65,
+     "converted_workload": null,
+     "n": 66
+    },
+    "quy mô chuẩn": {
+     "expected_duration_days": 65.17,
+     "converted_workload": null,
+     "n": 165
+    },
+    "quy mô lớn": {
+     "expected_duration_days": 118.26,
+     "converted_workload": null,
+     "n": 374
+    }
+   },
+   "default_complexity": "Cao",
+   "default_subtask_count": 7,
+   "default_dependency_count": 3,
+   "has_conversion": false
+  },
+  {
+   "name": "Viết báo cáo tự đánh giá",
+   "task_group": "Đảm bảo chất lượng",
+   "scales": {
+    "quy mô nhỏ": {
+     "expected_duration_days": 62.23,
+     "converted_workload": 24.42,
+     "n": 104
+    },
+    "quy mô chuẩn": {
+     "expected_duration_days": 97.28,
+     "converted_workload": 30.27,
+     "n": 311
+    },
+    "quy mô lớn": {
+     "expected_duration_days": 140.03,
+     "converted_workload": 30.64,
+     "n": 288
+    }
+   },
+   "default_complexity": "Cao",
+   "default_subtask_count": 8,
+   "default_dependency_count": 3,
+   "has_conversion": true
+  },
+  {
+   "name": "Xây dựng học phần mới",
+   "task_group": "CTĐT",
+   "scales": {
+    "quy mô nhỏ": {
+     "expected_duration_days": 29.34,
+     "converted_workload": 21.24,
+     "n": 75
+    },
+    "quy mô chuẩn": {
+     "expected_duration_days": 48.33,
+     "converted_workload": 24.26,
+     "n": 216
+    },
+    "quy mô lớn": {
+     "expected_duration_days": 70.41,
+     "converted_workload": 26.52,
+     "n": 180
+    }
+   },
+   "default_complexity": "Cao",
+   "default_subtask_count": 7,
+   "default_dependency_count": 3,
+   "has_conversion": true
+  },
+  {
+   "name": "Xây dựng/cập nhật đề cương học phần",
+   "task_group": "CTĐT",
+   "scales": {
+    "quy mô nhỏ": {
+     "expected_duration_days": 9.8,
+     "converted_workload": 16.05,
+     "n": 123
+    },
+    "quy mô chuẩn": {
+     "expected_duration_days": 16.19,
+     "converted_workload": 16.51,
+     "n": 390
+    },
+    "quy mô lớn": {
+     "expected_duration_days": 23.63,
+     "converted_workload": 16.77,
+     "n": 310
+    }
+   },
+   "default_complexity": "Cao",
+   "default_subtask_count": 7,
+   "default_dependency_count": 3,
+   "has_conversion": true
+  },
+  {
+   "name": "Xử lý cảnh báo học vụ của SV",
+   "task_group": "Cố vấn học tập",
+   "scales": {
+    "quy mô nhỏ": {
+     "expected_duration_days": 2.03,
+     "converted_workload": 1.83,
+     "n": 84
+    },
+    "quy mô chuẩn": {
+     "expected_duration_days": 3.15,
+     "converted_workload": 1.89,
+     "n": 243
+    },
+    "quy mô lớn": {
+     "expected_duration_days": 4.89,
+     "converted_workload": 2.07,
+     "n": 242
+    }
+   },
+   "default_complexity": "Trung bình",
+   "default_subtask_count": 5,
+   "default_dependency_count": 1,
+   "has_conversion": true
+  },
+  {
+   "name": "Đề xuất/đăng ký đề tài NCKH",
+   "task_group": "Nghiên cứu khoa học",
+   "scales": {
+    "quy mô nhỏ": {
+     "expected_duration_days": 9.47,
+     "converted_workload": 9.32,
+     "n": 52
+    },
+    "quy mô chuẩn": {
+     "expected_duration_days": 14.59,
+     "converted_workload": 11.7,
+     "n": 211
+    },
+    "quy mô lớn": {
+     "expected_duration_days": 22.08,
+     "converted_workload": 11.69,
+     "n": 319
+    }
+   },
+   "default_complexity": "Cao",
+   "default_subtask_count": 7,
+   "default_dependency_count": 3,
+   "has_conversion": true
+  }
+ ],
+ "profile_quantiles": {
+  "years_experience": [
+   5.0,
+   7.8,
+   15.4,
+   23.4,
+   29.4
+  ],
+  "tenure_days": [
+   300.0,
+   873.0,
+   2409.0,
+   4738.25,
+   7505.3
+  ],
+  "teaching_hours_semester": [
+   117.5,
+   146.7,
+   190.7,
+   241.0,
+   273.2
+  ],
+  "student_count": [
+   122.0,
+   161.0,
+   224.0,
+   290.0,
+   362.0
+  ],
+  "supervised_student_count": [
+   1.0,
+   2.0,
+   3.0,
+   5.0,
+   6.0
+  ],
+  "hist_avg_delay": [
+   1.5,
+   3.2,
+   6.45,
+   9.36,
+   12.8
+  ],
+  "hist_early_rate": [
+   0.31,
+   0.35,
+   0.4,
+   0.43,
+   0.47
+  ],
+  "hist_late_rate": [
+   0.05,
+   0.07,
+   0.11,
+   0.18,
+   0.27
+  ]
+ },
+ "profile_shares": {
+  "academic_rank": {
+   "Giảng viên": 0.657,
+   "Giảng viên chính": 0.266,
+   "Phó giáo sư": 0.077
+  },
+  "degree": {
+   "Tiến sĩ": 0.56,
+   "Thạc sĩ": 0.44
+  },
+  "management_role": {
+   "Không": 0.81,
+   "Phó trưởng bộ môn": 0.114,
+   "Trưởng bộ môn": 0.057,
+   "Phó trưởng khoa": 0.019
+  }
+ },
+ "hours_per_due_task": 24.1,
+ "baseline": {
+  "subtask_count": 5.0,
+  "dependency_count": 2.0,
+  "team_size": 3.0,
+  "is_urgent_assignment": 0.0,
+  "require_external_input": 0.0,
+  "require_approval": 0.0,
+  "available_days": 7.0,
+  "holiday_in_window": 0.0,
+  "expected_duration_days": 5.34,
+  "deadline_pressure": 0.79,
+  "converted_workload": 4.09,
+  "academic_week": 30.0,
+  "peak_season": 1.0,
+  "accreditation_flag": 0.0,
+  "years_experience": 15.5,
+  "tenure_days": 2427.0,
+  "teaching_hours_semester": 191.5,
+  "student_count": 224.0,
+  "supervised_student_count": 3.0,
+  "hist_count": 143.0,
+  "hist_late_rate": 0.11,
+  "hist_avg_delay": 6.4,
+  "hist_early_rate": 0.4,
+  "active_tasks": 8.0,
+  "active_high_priority_tasks": 3.0,
+  "overdue_open_tasks": 0.0,
+  "deadlines_next_7d": 1.0,
+  "deadlines_next_14d": 1.0,
+  "workload_next_14d": 30.4,
+  "hist_late_last5": 0.0,
+  "late_last_30d": 1.0,
+  "deadline_month_end": 0.0,
+  "converted_workload_missing": 0.0,
+  "hist_avg_delay_missing": 0.0,
+  "hist_early_rate_missing": 0.0,
+  "hist_late_last5_missing": 0.0,
+  "is_cold_start": 0.0,
+  "lecturer_task_count": 4.0,
+  "lecturer_task_late_rate": 0.15,
+  "dept_task_late_rate": 0.16,
+  "lecturer_task_late_lift": 0.0,
+  "complexity_num": 1.0,
+  "priority_num": 2.0,
+  "task_group": "Khảo thí",
+  "task_type": "Phản biện/duyệt đề thi",
+  "task_subtype": "Coi thi - quy mô chuẩn",
+  "assignment_level": "Khoa",
+  "assignment_mode": "Group",
+  "assignment_channel": "Email",
+  "priority": "Cao",
+  "complexity": "Trung bình",
+  "academic_period": "final_exam",
+  "semester": "HK2",
+  "academic_rank": "Giảng viên",
+  "degree": "Tiến sĩ",
+  "management_role": "Không",
+  "department": "K01 - Hệ thống thông tin",
+  "task_matrix_source": "personal"
+ }
+}
