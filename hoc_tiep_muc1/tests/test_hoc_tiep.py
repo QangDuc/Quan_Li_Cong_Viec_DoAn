@@ -151,6 +151,37 @@ def t_dry_run():
     assert not d["promoted"] and reg.current() == v1 and len(reg.versions()) == 1 and "details" in d
 
 
+def t_monitor_psi_drift():
+    from hoc_tiep.monitor import compute_psi
+    r = np.random.default_rng(42)
+    base = r.uniform(0.1, 0.4, 1000)
+    same = r.uniform(0.1, 0.4, 1000)
+    psi_same, status_same = compute_psi(base, same)
+    assert psi_same < 0.10 and status_same == "STABLE"
+
+    shifted = r.uniform(0.6, 0.9, 1000)
+    psi_shift, status_shift = compute_psi(base, shifted)
+    assert psi_shift >= 0.25 and status_shift == "SIGNIFICANT_DRIFT"
+
+
+def t_monitor_level2_evaluation():
+    from hoc_tiep.monitor import Level2Monitor, evaluate_monitoring_window
+    st = FeedbackStore()
+    d = make(500, "2026-01-01", 80, 42)
+    # Ghi nhận dự đoán và nhãn
+    st.log_predictions(d, np.full(500, 0.25), ["Thấp"] * 500, "v1", predicted_at="2026-01-01")
+    o = pd.DataFrame({"task_id": d.task_id, "lecturer_id": d.lecturer_id, "is_late": d.is_late,
+                      "completed_date": d.assigned_date + pd.Timedelta(days=5)})
+    st.record_outcomes(o, recorded_at="2026-04-01")
+
+    mon = Level2Monitor(st, thr=(0.20, 0.50))
+    res = mon.check_period("2026-04-02", window_days=100)
+    assert res["status"] in ["HEALTHY", "WARNING", "ALERT"]
+    assert res["n_samples"] == 500
+    assert "calibration_gap" in res
+    assert "drift_psi" in res
+
+
 if __name__ == "__main__":
     warnings.filterwarnings("ignore")
     tests = [v for k, v in sorted(globals().items()) if k.startswith("t_")]

@@ -19,12 +19,13 @@ from .serving import RiskService
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="hoc_tiep")
     sp = ap.add_subparsers(dest="cmd", required=True)
-    for n in ["init", "predict", "outcome", "retrain", "status", "rollback", "compare", "export"]:
+    for n in ["init", "predict", "outcome", "retrain", "status", "rollback", "compare", "export", "monitor"]:
         p = sp.add_parser(n)
         p.add_argument("--registry", default="registry"); p.add_argument("--store", default="feedback.db")
         p.add_argument("--base"); p.add_argument("--input"); p.add_argument("--output"); p.add_argument("--cutoff")
         p.add_argument("--as-of"); p.add_argument("--dry-run", action="store_true"); p.add_argument("--reason", default="")
-        p.add_argument("--thr-current", default="0.2,0.5"); p.add_argument("--thr-candidate", default="0.2,0.5")
+        p.add_argument("--thr-current", default="0.23,0.52"); p.add_argument("--thr-candidate", default="0.23,0.52")
+        p.add_argument("--window", type=int, default=90)
     a = ap.parse_args(argv)
     cfg = Config()
     if a.cmd == "init":
@@ -58,6 +59,11 @@ def main(argv=None):
         ok, checks, det = retrain_job.gate(d.y.values, d.p_current.values, d.p_candidate.values, d.lecturer_id.values,
                                            [float(x) for x in a.thr_current.split(",")], [float(x) for x in a.thr_candidate.split(",")], cfg)
         print("ĐẠT" if ok else "KHÔNG ĐẠT")
+    elif a.cmd == "monitor":
+        from .monitor import Level2Monitor
+        mon = Level2Monitor(FeedbackStore(a.store), thr=[float(x) for x in a.thr_current.split(",")])
+        res = mon.check_period(a.as_of or pd.Timestamp.today(), window_days=a.window)
+        print(json.dumps(res, ensure_ascii=False, indent=2, default=str))
         for k, v in checks.items(): print(("  ✓ " if v[0] else "  ✗ ") + k + ": " + v[1])
         print(json.dumps(det["delta"], indent=1))
 
