@@ -1,0 +1,56 @@
+{
+ "dynamic": false,
+ "n_train": 59966,
+ "n_val": 14891,
+ "n_test": 24908,
+ "models": {
+  "logistic_base": {
+   "val_logloss": 0.38319,
+   "params": {
+    "C": 0.01
+   },
+   "test": {
+    "roc_auc": 0.8072,
+    "pr_auc": 0.5936,
+    "brier": 0.1274,
+    "ece": 0.0113,
+    "base_rate": 0.2172,
+    "recall_at_top20pct": 0.5305,
+    "precision_at_top20pct": 0.5761
+   }
+  },
+  "logistic_spline": {
+   "val_logloss": 0.37859,
+   "params": {
+    "C": 0.1
+   },
+   "test": {
+    "roc_auc": 0.8083,
+    "pr_auc": 0.5963,
+    "brier": 0.1278,
+    "ece": 0.0285,
+    "base_rate": 0.2172,
+    "recall_at_top20pct": 0.5318,
+    "precision_at_top20pct": 0.5775
+   }
+  },
+  "catboost": {
+   "val_logloss": 0.37882,
+   "params": {
+    "depth": 6,
+    "learning_rate": 0.05,
+    "l2_leaf_reg": 3.0,
+    "iterations": 400
+   },
+   "test": {
+    "roc_auc": 0.8095,
+    "pr_auc": 0.597,
+    "brier": 0.1268,
+    "ece": 0.0144,
+    "base_rate": 0.2172,
+    "recall_at_top20pct": 0.5349,
+    "precision_at_top20pct": 0.5809
+   }
+  }
+ }
+}

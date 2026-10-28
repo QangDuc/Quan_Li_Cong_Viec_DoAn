@@ -6,29 +6,29 @@
   "fast_cpu": {
     "note": "Mô hình nhẹ HistGradientBoosting 4 túi dùng cho --fast-cpu (demo web). KHÔNG phải TabPFN; huấn luyện trên train+validation.",
     "test": {
-      "roc_auc": 0.815,
-      "pr_auc": 0.5968,
-      "brier": 0.1162,
-      "ece": 0.0101,
-      "base_rate": 0.1984,
-      "recall_at_top20pct": 0.5669,
-      "precision_at_top20pct": 0.5625
+      "roc_auc": 0.8047,
+      "pr_auc": 0.5917,
+      "brier": 0.1282,
+      "ece": 0.0192,
+      "base_rate": 0.2172,
+      "recall_at_top20pct": 0.529,
+      "precision_at_top20pct": 0.5745
     },
     "alert_levels_with_main_thresholds": {
       "Thấp": {
-        "n": 18471,
-        "late_rate": 0.0949
+        "n": 17809,
+        "late_rate": 0.1074
       },
       "Trung bình": {
-        "n": 3593,
-        "late_rate": 0.3343
+        "n": 4928,
+        "late_rate": 0.3866
       },
       "Cao": {
-        "n": 2930,
-        "late_rate": 0.6846
+        "n": 2171,
+        "late_rate": 0.7338
       }
     },
-    "spearman_vs_main": 0.9522
+    "spearman_vs_main": 0.9535
   },
   "context": {
     "max_context": 10000,
@@ -40,24 +40,24 @@
     "n_estimators": 8,
     "softmax_temperature": 0.9
   },
-  "val_logloss": 0.3736,
+  "val_logloss": 0.3825,
   "test": {
-    "roc_auc": 0.8195,
-    "pr_auc": 0.6046,
-    "brier": 0.1148,
-    "ece": 0.0054,
-    "base_rate": 0.1984,
-    "recall_at_top20pct": 0.5687,
-    "precision_at_top20pct": 0.5643
+    "roc_auc": 0.809,
+    "pr_auc": 0.5972,
+    "brier": 0.1266,
+    "ece": 0.0075,
+    "base_rate": 0.2172,
+    "recall_at_top20pct": 0.5333,
+    "precision_at_top20pct": 0.5791
   },
   "test_auc_ci95": [
-    0.806,
-    0.8298
+    0.7962,
+    0.8205
   ],
   "test_auc_ci95_method": "bootstrap theo cụm giảng viên",
   "test_auc_ci95_by_row": [
-    0.8137,
-    0.8263
+    0.8029,
+    0.8162
   ],
   "threshold_config": {
     "max_late_low": 0.1,
@@ -68,120 +68,120 @@
   },
   "thresholds": [
     0.23,
-    0.45
+    0.52
   ],
   "thresholds_from_target_precision": true,
   "pruned_groups": [],
   "segments": {
     "giảng viên mới (lịch sử < 5 việc)": {
-      "n": 225,
-      "late_rate": 0.067,
-      "mean_pred": 0.056,
-      "auc": 0.672
+      "n": 189,
+      "late_rate": 0.063,
+      "mean_pred": 0.067,
+      "auc": null
     },
     "giảng viên có lịch sử >= 5 việc": {
-      "n": 24769,
-      "late_rate": 0.2,
-      "mean_pred": 0.194,
-      "auc": 0.819
+      "n": 24719,
+      "late_rate": 0.218,
+      "mean_pred": 0.214,
+      "auc": 0.809
     },
     "mùa cao điểm": {
-      "n": 13148,
-      "late_rate": 0.229,
-      "mean_pred": 0.216,
-      "auc": 0.827
+      "n": 12874,
+      "late_rate": 0.243,
+      "mean_pred": 0.235,
+      "auc": 0.817
     },
     "độ phức tạp cao": {
-      "n": 7103,
-      "late_rate": 0.279,
-      "mean_pred": 0.281,
-      "auc": 0.809
+      "n": 6314,
+      "late_rate": 0.319,
+      "mean_pred": 0.324,
+      "auc": 0.799
     }
   },
   "alert_levels": {
     "Thấp": {
-      "n": 18305,
-      "late_rate": 0.0916,
-      "share": 0.7324
+      "n": 17172,
+      "late_rate": 0.1004,
+      "share": 0.6894
     },
     "Trung bình": {
-      "n": 3506,
-      "late_rate": 0.3283,
-      "share": 0.1403
+      "n": 4927,
+      "late_rate": 0.353,
+      "share": 0.1978
     },
     "Cao": {
-      "n": 3183,
-      "late_rate": 0.6698,
-      "share": 0.1274
+      "n": 2809,
+      "late_rate": 0.6931,
+      "share": 0.1128
     }
   },
   "target_check": {
     "max_late_low": 0.1,
-    "actual_low": 0.0916,
-    "ok_low": true,
+    "actual_low": 0.1004,
+    "ok_low": false,
     "min_prec_high": 0.6,
-    "actual_high": 0.6698,
+    "actual_high": 0.6931,
     "ok_high": true
   },
   "calibration_deciles": [
     {
-      "mean_pred": 0.0251,
-      "late_rate": 0.038,
-      "n": 2500
+      "mean_pred": 0.0277,
+      "late_rate": 0.0369,
+      "n": 2491
     },
     {
-      "mean_pred": 0.0377,
-      "late_rate": 0.0412,
-      "n": 2499
+      "mean_pred": 0.0428,
+      "late_rate": 0.0562,
+      "n": 2491
     },
     {
-      "mean_pred": 0.0507,
-      "late_rate": 0.0596,
-      "n": 2499
+      "mean_pred": 0.0588,
+      "late_rate": 0.0642,
+      "n": 2491
     },
     {
-      "mean_pred": 0.067,
-      "late_rate": 0.0716,
-      "n": 2500
+      "mean_pred": 0.0791,
+      "late_rate": 0.0815,
+      "n": 2490
     },
     {
-      "mean_pred": 0.0894,
-      "late_rate": 0.092,
-      "n": 2499
+      "mean_pred": 0.1061,
+      "late_rate": 0.1192,
+      "n": 2491
     },
     {
-      "mean_pred": 0.1217,
-      "late_rate": 0.1297,
-      "n": 2499
+      "mean_pred": 0.1444,
+      "late_rate": 0.1558,
+      "n": 2491
     },
     {
-      "mean_pred": 0.1703,
-      "late_rate": 0.1744,
-      "n": 2500
+      "mean_pred": 0.2016,
+      "late_rate": 0.2048,
+      "n": 2490
     },
     {
-      "mean_pred": 0.2498,
-      "late_rate": 0.2493,
-      "n": 2499
+      "mean_pred": 0.2932,
+      "late_rate": 0.2951,
+      "n": 2491
     },
     {
-      "mean_pred": 0.4048,
-      "late_rate": 0.4138,
-      "n": 2499
+      "mean_pred": 0.4481,
+      "late_rate": 0.4492,
+      "n": 2491
     },
     {
-      "mean_pred": 0.715,
-      "late_rate": 0.7148,
-      "n": 2500
+      "mean_pred": 0.7227,
+      "late_rate": 0.709,
+      "n": 2491
     }
   ],
-  "n_train": 60112,
-  "n_test": 24994,
+  "n_train": 59966,
+  "n_test": 24908,
   "meta": {
-    "trained_at": "2026-10-22T08:00:03+00:00",
+    "trained_at": "2026-10-28T11:00:24+00:00",
     "data_start": "2024-02-12",
-    "data_end": "2026-12-30",
-    "n_rows": 60112,
+    "data_end": "2027-01-04",
+    "n_rows": 59966,
     "n_features": 55,
     "feature_schema": [
       "task_group",
@@ -241,7 +241,7 @@
       "priority_num"
     ],
     "versions": {
-      "python": "3.13.15",
+      "python": "3.13.16",
       "tabpfn": "9.2.0",
       "torch": "2.11.0+cu130",
       "sklearn": "1.6.1"
@@ -255,7 +255,7 @@
       "no_tune": true,
       "backend": "tabpfn"
     },
-    "test_after": "2027-08-10",
-    "train_end": "2026-12-30"
+    "test_after": "2027-08-18",
+    "train_end": "2027-01-04"
   }
 }

@@ -125,3 +125,126 @@ AUC 0.8358 | PR-AUC 0.6565 | Brier 0.1146 | ECE 0.0111 | Spearman với TabPFN 0
     Tăng rủi ro (so với mức điển hình): số việc đang mở = 20; chưa cập nhật tiến độ = 1; tỉ lệ trễ lịch sử = 0.561 | Giảm rủi ro: áp lực deadline = 0.629
 - T047905 (Tham gia hội đồng chuyên môn): có 98% khả năng giảng viên GV291 trễ deadline này -> mức Cao (thực tế: trễ)
     Tăng rủi ro (so với mức điển hình): số việc đang mở = 18; chênh lệch tiến độ so với kỳ vọng (%) = -20.1; khối lượng đến hạn trong 14 ngày (giờ) = 500 | Giảm rủi ro: số lần GV đã làm loại việc này = 26; số việc đã hoàn thành trước đây = 368
+
+======================================================================
+LẦN CHẠY train — 2026-10-28 11:04:09
+======================================================================
+Train 77520 (<= 2026-12-29) | Validation 19368 | Test 32228 (> 2027-08-11, 7820 việc trễ) | 62 đặc trưng | mô hình: TabPFN v2 | thiết bị: cuda | ngữ cảnh tối đa 10,000 dòng x 4 túi (random)
+   [va0] lô 1/20 (túi 1/4) | đã chạy 1.5 phút | còn khoảng 27.7 phút
+   [va0] lô 2/20 (túi 1/4) | đã chạy 2.9 phút | còn khoảng 25.8 phút
+   [va0] lô 3/20 (túi 1/4) | đã chạy 4.3 phút | còn khoảng 24.2 phút
+   [va0] lô 4/20 (túi 1/4) | đã chạy 5.7 phút | còn khoảng 22.7 phút
+   [va0] lô 5/20 (túi 1/4) | đã chạy 7.0 phút | còn khoảng 21.1 phút
+   [va0] lô 6/20 (túi 2/4) | đã chạy 8.5 phút | còn khoảng 19.7 phút
+   [va0] lô 7/20 (túi 2/4) | đã chạy 9.9 phút | còn khoảng 18.3 phút
+   [va0] lô 8/20 (túi 2/4) | đã chạy 11.3 phút | còn khoảng 16.9 phút
+   [va0] lô 9/20 (túi 2/4) | đã chạy 12.7 phút | còn khoảng 15.5 phút
+   [va0] lô 10/20 (túi 2/4) | đã chạy 14.0 phút | còn khoảng 14.0 phút
+   [va0] lô 11/20 (túi 3/4) | đã chạy 15.5 phút | còn khoảng 12.7 phút
+   [va0] lô 12/20 (túi 3/4) | đã chạy 16.9 phút | còn khoảng 11.3 phút
+   [va0] lô 13/20 (túi 3/4) | đã chạy 18.3 phút | còn khoảng 9.8 phút
+   [va0] lô 14/20 (túi 3/4) | đã chạy 19.7 phút | còn khoảng 8.4 phút
+   [va0] lô 15/20 (túi 3/4) | đã chạy 21.0 phút | còn khoảng 7.0 phút
+   [va0] lô 16/20 (túi 4/4) | đã chạy 22.5 phút | còn khoảng 5.6 phút
+   [va0] lô 17/20 (túi 4/4) | đã chạy 23.9 phút | còn khoảng 4.2 phút
+   [va0] lô 18/20 (túi 4/4) | đã chạy 25.3 phút | còn khoảng 2.8 phút
+   [va0] lô 19/20 (túi 4/4) | đã chạy 26.7 phút | còn khoảng 1.4 phút
+   [va0] lô 20/20 (túi 4/4) | đã chạy 28.1 phút | còn khoảng 0.0 phút
+   [va0] 20 lô vừa tính, 0 lô nạp lại từ điểm lưu
+   [tune] {'n_estimators': 8, 'softmax_temperature': 0.9} -> log-loss validation = 0.3812
+   [te] lô 1/36 (túi 1/4) | đã chạy 1.4 phút | còn khoảng 49.3 phút
+   [te] lô 2/36 (túi 1/4) | đã chạy 2.8 phút | còn khoảng 47.9 phút
+   [te] lô 3/36 (túi 1/4) | đã chạy 4.2 phút | còn khoảng 46.5 phút
+   [te] lô 4/36 (túi 1/4) | đã chạy 5.6 phút | còn khoảng 45.1 phút
+   [te] lô 5/36 (túi 1/4) | đã chạy 7.0 phút | còn khoảng 43.7 phút
+   [te] lô 6/36 (túi 1/4) | đã chạy 8.5 phút | còn khoảng 42.3 phút
+   [te] lô 7/36 (túi 1/4) | đã chạy 9.9 phút | còn khoảng 40.9 phút
+   [te] lô 8/36 (túi 1/4) | đã chạy 11.3 phút | còn khoảng 39.4 phút
+   [te] lô 9/36 (túi 1/4) | đã chạy 12.3 phút | còn khoảng 36.9 phút
+   [te] lô 10/36 (túi 2/4) | đã chạy 13.7 phút | còn khoảng 35.6 phút
+   [te] lô 11/36 (túi 2/4) | đã chạy 15.1 phút | còn khoảng 34.3 phút
+   [te] lô 12/36 (túi 2/4) | đã chạy 16.5 phút | còn khoảng 33.0 phút
+   [te] lô 13/36 (túi 2/4) | đã chạy 17.9 phút | còn khoảng 31.7 phút
+   [te] lô 14/36 (túi 2/4) | đã chạy 19.3 phút | còn khoảng 30.4 phút
+   [te] lô 15/36 (túi 2/4) | đã chạy 20.7 phút | còn khoảng 29.0 phút
+   [te] lô 16/36 (túi 2/4) | đã chạy 22.1 phút | còn khoảng 27.7 phút
+   [te] lô 17/36 (túi 2/4) | đã chạy 23.6 phút | còn khoảng 26.3 phút
+   [te] lô 18/36 (túi 2/4) | đã chạy 24.6 phút | còn khoảng 24.6 phút
+   [te] lô 19/36 (túi 3/4) | đã chạy 26.0 phút | còn khoảng 23.2 phút
+   [te] lô 20/36 (túi 3/4) | đã chạy 27.4 phút | còn khoảng 21.9 phút
+   [te] lô 21/36 (túi 3/4) | đã chạy 28.8 phút | còn khoảng 20.6 phút
+   [te] lô 22/36 (túi 3/4) | đã chạy 30.2 phút | còn khoảng 19.2 phút
+   [te] lô 23/36 (túi 3/4) | đã chạy 31.6 phút | còn khoảng 17.9 phút
+   [te] lô 24/36 (túi 3/4) | đã chạy 33.0 phút | còn khoảng 16.5 phút
+   [te] lô 25/36 (túi 3/4) | đã chạy 34.4 phút | còn khoảng 15.2 phút
+   [te] lô 26/36 (túi 3/4) | đã chạy 35.8 phút | còn khoảng 13.8 phút
+   [te] lô 27/36 (túi 3/4) | đã chạy 36.9 phút | còn khoảng 12.3 phút
+   [te] lô 28/36 (túi 4/4) | đã chạy 38.3 phút | còn khoảng 10.9 phút
+   [te] lô 29/36 (túi 4/4) | đã chạy 39.7 phút | còn khoảng 9.6 phút
+   [te] lô 30/36 (túi 4/4) | đã chạy 41.1 phút | còn khoảng 8.2 phút
+   [te] lô 31/36 (túi 4/4) | đã chạy 42.5 phút | còn khoảng 6.9 phút
+   [te] lô 32/36 (túi 4/4) | đã chạy 43.9 phút | còn khoảng 5.5 phút
+   [te] lô 33/36 (túi 4/4) | đã chạy 45.3 phút | còn khoảng 4.1 phút
+   [te] lô 34/36 (túi 4/4) | đã chạy 46.7 phút | còn khoảng 2.7 phút
+   [te] lô 35/36 (túi 4/4) | đã chạy 48.1 phút | còn khoảng 1.4 phút
+   [te] lô 36/36 (túi 4/4) | đã chạy 49.1 phút | còn khoảng 0.0 phút
+   [te] 36 lô vừa tính, 0 lô nạp lại từ điểm lưu
+
+MÔ HÌNH CHÍNH: TabPFN v2 | params = {'n_estimators': 8, 'softmax_temperature': 0.9} | log-loss validation = 0.3812
+
+=== KẾT QUẢ TRÊN TẬP TEST (theo thời gian) ===
+roc_auc                  0.836
+pr_auc                   0.675
+brier                    0.125
+ece                      0.005
+base_rate                0.243
+recall_at_top20pct       0.554
+precision_at_top20pct    0.672
+AUC 0.836 (khoảng tin cậy 95%, bootstrap theo giảng viên: 0.825-0.846; theo từng dòng: 0.830-0.841)
+
+=== MỨC CẢNH BÁO (ngưỡng [0.26, 0.42] chọn trên validation, có biên an toàn 0.01) ===
+            so_viec  ti_le_tre_thuc_te  ti_le_viec
+level                                             
+Thấp          22161              0.103       0.688
+Trung bình     3672              0.335       0.114
+Cao            6395              0.675       0.198
+   Mục tiêu: nhóm Thấp trễ <= 10% -> thực tế trên test 10.3% (KHÔNG đạt); nhóm Cao chính xác >= 60% -> thực tế 67.5% (đạt)
+
+=== HIỆU CHUẨN THEO DECILE ===
+                                    p      y
+nhom                                        
+(0.009899999999999999, 0.0366]  0.028  0.036
+(0.0366, 0.0517]                0.044  0.050
+(0.0517, 0.0703]                0.061  0.067
+(0.0703, 0.0951]                0.082  0.088
+(0.0951, 0.131]                 0.112  0.112
+(0.131, 0.186]                  0.157  0.162
+(0.186, 0.274]                  0.225  0.223
+(0.274, 0.417]                  0.340  0.344
+(0.417, 0.662]                  0.530  0.535
+(0.662, 0.986]                  0.814  0.809
+
+=== HIỆU QUẢ THEO NHÓM ===
+                                                    n  late_rate  mean_pred    auc
+giảng viên mới (lịch sử < 5 việc)               249.0      0.056      0.084    NaN
+giảng viên có lịch sử >= 5 việc               31979.0      0.244      0.241  0.835
+mùa cao điểm                                  15732.0      0.276      0.270  0.849
+độ phức tạp cao                               11591.0      0.321      0.328  0.830
+mốc kiểm tra 25% thời gian (checkpoint 0.25)  16722.0      0.234      0.235  0.828
+mốc kiểm tra 50% thời gian (checkpoint 0.50)  15506.0      0.252      0.243  0.843
+chậm tiến độ > 10% (progress_gap < -10)        6738.0      0.350      0.348  0.839
+chưa cập nhật tiến độ (progress_missing = 1)   2244.0      0.569      0.553  0.820
+Đang huấn luyện kèm tổ hợp mô hình nhẹ (HistGradientBoosting 4 túi) cho chế độ --fast-cpu...
+
+=== MÔ HÌNH NHẸ --fast-cpu (HGB) TRÊN TEST (so với mô hình chính) ===
+AUC 0.8297 | PR-AUC 0.6673 | Brier 0.1276 | ECE 0.0251 | Spearman với TabPFN 0.944
+
+Đã lưu ngữ cảnh + bộ mã hóa + fast_models + báo cáo vào /content/drive/MyDrive/ket_qua_B/model_dynamic
+
+=== VÍ DỤ CẢNH BÁO ===
+- T030369 (Đề xuất/đăng ký đề tài NCKH): có 99% khả năng giảng viên GV180 trễ deadline này -> mức Cao (thực tế: trễ)
+    Tăng rủi ro (so với mức điển hình): chênh lệch tiến độ so với kỳ vọng (%) = -35.9; số việc đang mở = 14; tỉ lệ trễ lịch sử = 0.358 | Giảm rủi ro: số việc đã hoàn thành trước đây = 362
+- T058507 (Chuẩn bị bài thực hành/lab CNTT): có 98% khả năng giảng viên GV044 trễ deadline này -> mức Cao (thực tế: trễ)
+    Tăng rủi ro (so với mức điển hình): số việc đang mở = 16; chênh lệch tiến độ so với kỳ vọng (%) = -25.3; tỉ lệ trễ lịch sử = 0.295 | Giảm rủi ro: mức ưu tiên = Cao; số việc đã hoàn thành trước đây = 284
+- T011338 (Viết bài báo khoa học): có 98% khả năng giảng viên GV066 trễ deadline này -> mức Cao (thực tế: trễ)
+    Tăng rủi ro (so với mức điển hình): áp lực deadline = 2.78; chênh lệch tiến độ so với kỳ vọng (%) = -29.3; tỉ lệ trễ lịch sử = 0.435 | Giảm rủi ro: mức ưu tiên = Cao; số việc đã hoàn thành trước đây = 375
