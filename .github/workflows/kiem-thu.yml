@@ -1,0 +1,50 @@
+name: kiem-thu-mlops
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  schedule:
+    - cron: "0 2 * * 1"      # Chạy định kỳ vào thứ Hai hằng tuần (02:00 UTC)
+  workflow_dispatch:          # Cho phép bấm nút kích hoạt thủ công trên giao diện GitHub
+
+jobs:
+  kiem-tra-mlops-va-backend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout mã nguồn
+        uses: actions/checkout@v4
+
+      - name: Cài đặt Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Cài đặt thư viện phụ thuộc
+        run: |
+          python -m pip install --upgrade pip
+          pip install numpy pandas scikit-learn==1.6.1 joblib pytest fastapi pydantic sqlalchemy
+
+      - name: Kiểm tra cú pháp (Compile Syntax Check) toàn bộ mã nguồn .py
+        run: |
+          git ls-files '*.py' | xargs python -m py_compile
+
+      - name: Chạy Kiểm thử MLOps Học tiếp (11 ca test đơn vị)
+        run: |
+          if [ -f hoc_tiep_muc1/tests/test_hoc_tiep.py ]; then
+            PYTHONPATH=hoc_tiep_muc1 python hoc_tiep_muc1/tests/test_hoc_tiep.py
+          elif [ -f tests/test_hoc_tiep.py ]; then
+            python tests/test_hoc_tiep.py
+          else
+            echo "Không tìm thấy test_hoc_tiep.py, bỏ qua."
+          fi
+
+      - name: Chạy Kiểm thử Trích xuất Đặc trưng Máy học (Backend ML Features)
+        run: |
+          if [ -f backend/tests/test_ml_features.py ]; then
+            PYTHONPATH=backend pytest backend/tests/test_ml_features.py -v
+          fi
+

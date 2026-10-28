@@ -1,0 +1,730 @@
+[
+ {
+  "as_of": "2026-04-01",
+  "current": "v0001",
+  "promoted": false,
+  "candidate": null,
+  "reasons": [
+   "cửa sổ so sánh quá nhỏ: 0 < 2000 (cần đợi việc mới 'chín')"
+  ],
+  "checks": {},
+  "dry_run": false,
+  "n_excluded_intervened": 0,
+  "n_new_labeled": 3992,
+  "n_new_late": 672,
+  "missing_feature_share": 0.0,
+  "windows": {
+   "holdout": [
+    "2026-01-01",
+    "2025-12-02"
+   ],
+   "val_start": "2025-10-03",
+   "cur_data_end": "2025-12-31"
+  },
+  "n_holdout": 0,
+  "n_holdout_late": 0,
+  "n_holdout_lecturers": 0
+ },
+ {
+  "as_of": "2026-07-01",
+  "current": "v0001",
+  "promoted": false,
+  "candidate": null,
+  "reasons": [
+   "tot_hon_co_y_nghia: cận trên Δlogloss +0.0000 < 0"
+  ],
+  "checks": {
+   "auc_khong_kem": {
+    "ok": true,
+    "detail": "cận dưới ΔAUC +0.0000 >= -0.0020"
+   },
+   "logloss_khong_kem": {
+    "ok": true,
+    "detail": "cận trên Δlogloss +0.0000 <= +0.0020"
+   },
+   "auc_san": {
+    "ok": true,
+    "detail": "AUC ứng viên 0.7860 >= 0.65"
+   },
+   "muc_canh_bao": {
+    "ok": true,
+    "detail": "Thấp trễ 0.102 (hiện tại 0.090); Cao chính xác 0.772 (hiện tại 0.772)"
+   },
+   "tot_hon_co_y_nghia": {
+    "ok": false,
+    "detail": "cận trên Δlogloss +0.0000 < 0"
+   }
+  },
+  "dry_run": false,
+  "n_excluded_intervened": 0,
+  "n_new_labeled": 10167,
+  "n_new_late": 1837,
+  "missing_feature_share": 0.0,
+  "windows": {
+   "holdout": [
+    "2026-01-01",
+    "2026-03-03"
+   ],
+   "val_start": "2025-10-03",
+   "cur_data_end": "2025-12-31"
+  },
+  "n_holdout": 3444,
+  "n_holdout_late": 665,
+  "n_holdout_lecturers": 287,
+  "candidate_thresholds": [
+   0.19,
+   0.63
+  ],
+  "thresholds_met_on_val": true,
+  "delta": {
+   "auc": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "logloss": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "brier": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "n_boot_ok": 300
+  }
+ },
+ {
+  "as_of": "2026-10-01",
+  "current": "v0001",
+  "promoted": true,
+  "candidate": "v0002",
+  "reasons": [],
+  "checks": {
+   "auc_khong_kem": {
+    "ok": true,
+    "detail": "cận dưới ΔAUC +0.0001 >= -0.0020"
+   },
+   "logloss_khong_kem": {
+    "ok": true,
+    "detail": "cận trên Δlogloss -0.0013 <= +0.0020"
+   },
+   "auc_san": {
+    "ok": true,
+    "detail": "AUC ứng viên 0.8019 >= 0.65"
+   },
+   "muc_canh_bao": {
+    "ok": true,
+    "detail": "Thấp trễ 0.072 (hiện tại 0.085); Cao chính xác 0.693 (hiện tại 0.754)"
+   },
+   "tot_hon_co_y_nghia": {
+    "ok": true,
+    "detail": "cận trên Δlogloss -0.0013 < 0"
+   }
+  },
+  "dry_run": false,
+  "n_excluded_intervened": 0,
+  "n_new_labeled": 14896,
+  "n_new_late": 2880,
+  "missing_feature_share": 0.0,
+  "windows": {
+   "holdout": [
+    "2026-03-05",
+    "2026-06-03"
+   ],
+   "val_start": "2025-12-05",
+   "cur_data_end": "2025-12-31"
+  },
+  "n_holdout": 5144,
+  "n_holdout_late": 981,
+  "n_holdout_lecturers": 296,
+  "candidate_thresholds": [
+   0.14,
+   0.55
+  ],
+  "thresholds_met_on_val": true,
+  "delta": {
+   "auc": [
+    0.005847347500662847,
+    8.021759331379723e-05,
+    0.012001778256187543
+   ],
+   "logloss": [
+    -0.005316373924311613,
+    -0.010017655030690875,
+    -0.0013278291445634868
+   ],
+   "brier": [
+    -0.002089975939251129,
+    -0.003629120335630848,
+    -0.0005679315516131418
+   ],
+   "n_boot_ok": 300
+  }
+ },
+ {
+  "as_of": "2027-01-01",
+  "current": "v0002",
+  "promoted": false,
+  "candidate": null,
+  "reasons": [
+   "auc_khong_kem: cận dưới ΔAUC -0.0041 >= -0.0020",
+   "tot_hon_co_y_nghia: cận trên Δlogloss +0.0019 < 0"
+  ],
+  "checks": {
+   "auc_khong_kem": {
+    "ok": false,
+    "detail": "cận dưới ΔAUC -0.0041 >= -0.0020"
+   },
+   "logloss_khong_kem": {
+    "ok": true,
+    "detail": "cận trên Δlogloss +0.0019 <= +0.0020"
+   },
+   "auc_san": {
+    "ok": true,
+    "detail": "AUC ứng viên 0.8007 >= 0.65"
+   },
+   "muc_canh_bao": {
+    "ok": true,
+    "detail": "Thấp trễ 0.083 (hiện tại 0.080); Cao chính xác 0.664 (hiện tại 0.690)"
+   },
+   "tot_hon_co_y_nghia": {
+    "ok": false,
+    "detail": "cận trên Δlogloss +0.0019 < 0"
+   }
+  },
+  "dry_run": false,
+  "n_excluded_intervened": 0,
+  "n_new_labeled": 16973,
+  "n_new_late": 3125,
+  "missing_feature_share": 0.0,
+  "windows": {
+   "holdout": [
+    "2026-06-05",
+    "2026-09-03"
+   ],
+   "val_start": "2026-03-07",
+   "cur_data_end": "2026-03-04"
+  },
+  "n_holdout": 5241,
+  "n_holdout_late": 1117,
+  "n_holdout_lecturers": 299,
+  "candidate_thresholds": [
+   0.15,
+   0.48
+  ],
+  "thresholds_met_on_val": true,
+  "delta": {
+   "auc": [
+    0.0005744047334769187,
+    -0.004067728218161121,
+    0.005429044628207515
+   ],
+   "logloss": [
+    -0.002050534463773901,
+    -0.006226543420159386,
+    0.0018525596317023755
+   ],
+   "brier": [
+    -0.0012893954849529377,
+    -0.0029072050655475088,
+    5.449667765659873e-05
+   ],
+   "n_boot_ok": 300
+  }
+ },
+ {
+  "as_of": "2027-04-01",
+  "current": "v0002",
+  "promoted": false,
+  "candidate": null,
+  "reasons": [
+   "auc_khong_kem: cận dưới ΔAUC -0.0031 >= -0.0020",
+   "muc_canh_bao: Thấp trễ 0.065 (hiện tại 0.068); Cao chính xác 0.514 (hiện tại 0.538)"
+  ],
+  "checks": {
+   "auc_khong_kem": {
+    "ok": false,
+    "detail": "cận dưới ΔAUC -0.0031 >= -0.0020"
+   },
+   "logloss_khong_kem": {
+    "ok": true,
+    "detail": "cận trên Δlogloss -0.0011 <= +0.0020"
+   },
+   "auc_san": {
+    "ok": true,
+    "detail": "AUC ứng viên 0.7564 >= 0.65"
+   },
+   "muc_canh_bao": {
+    "ok": false,
+    "detail": "Thấp trễ 0.065 (hiện tại 0.068); Cao chính xác 0.514 (hiện tại 0.538)"
+   },
+   "tot_hon_co_y_nghia": {
+    "ok": true,
+    "detail": "cận trên Δlogloss -0.0011 < 0"
+   }
+  },
+  "dry_run": false,
+  "n_excluded_intervened": 0,
+  "n_new_labeled": 22610,
+  "n_new_late": 4358,
+  "missing_feature_share": 0.0,
+  "windows": {
+   "holdout": [
+    "2026-09-03",
+    "2026-12-02"
+   ],
+   "val_start": "2026-06-05",
+   "cur_data_end": "2026-03-04"
+  },
+  "n_holdout": 4703,
+  "n_holdout_late": 717,
+  "n_holdout_lecturers": 301,
+  "candidate_thresholds": [
+   0.12,
+   0.46
+  ],
+  "thresholds_met_on_val": true,
+  "delta": {
+   "auc": [
+    0.004527352008179331,
+    -0.0031432799441616283,
+    0.01273419311353898
+   ],
+   "logloss": [
+    -0.005261736154037078,
+    -0.009773464072675377,
+    -0.0011322884366300663
+   ],
+   "brier": [
+    -0.002047327729964535,
+    -0.003537187839922855,
+    -0.0006179984155918854
+   ],
+   "n_boot_ok": 300
+  }
+ },
+ {
+  "as_of": "2027-07-01",
+  "current": "v0002",
+  "promoted": true,
+  "candidate": "v0003",
+  "reasons": [],
+  "checks": {
+   "auc_khong_kem": {
+    "ok": true,
+    "detail": "cận dưới ΔAUC +0.0005 >= -0.0020"
+   },
+   "logloss_khong_kem": {
+    "ok": true,
+    "detail": "cận trên Δlogloss -0.0048 <= +0.0020"
+   },
+   "auc_san": {
+    "ok": true,
+    "detail": "AUC ứng viên 0.8027 >= 0.65"
+   },
+   "muc_canh_bao": {
+    "ok": true,
+    "detail": "Thấp trễ 0.085 (hiện tại 0.071); Cao chính xác 0.778 (hiện tại 0.632)"
+   },
+   "tot_hon_co_y_nghia": {
+    "ok": true,
+    "detail": "cận trên Δlogloss -0.0048 < 0"
+   }
+  },
+  "dry_run": false,
+  "n_excluded_intervened": 0,
+  "n_new_labeled": 29491,
+  "n_new_late": 5562,
+  "missing_feature_share": 0.0,
+  "windows": {
+   "holdout": [
+    "2026-12-03",
+    "2027-03-03"
+   ],
+   "val_start": "2026-09-04",
+   "cur_data_end": "2026-03-04"
+  },
+  "n_holdout": 6506,
+  "n_holdout_late": 1388,
+  "n_holdout_lecturers": 309,
+  "candidate_thresholds": [
+   0.17,
+   0.73
+  ],
+  "thresholds_met_on_val": true,
+  "delta": {
+   "auc": [
+    0.005282536743797306,
+    0.0005096568390029394,
+    0.010672074067704727
+   ],
+   "logloss": [
+    -0.00960786199053365,
+    -0.014445741466178878,
+    -0.0048335774948226025
+   ],
+   "brier": [
+    -0.0040472934729693655,
+    -0.005742266461657807,
+    -0.0022950490252512164
+   ],
+   "n_boot_ok": 300
+  }
+ },
+ {
+  "as_of": "2027-10-01",
+  "current": "v0003",
+  "promoted": false,
+  "candidate": null,
+  "reasons": [
+   "auc_khong_kem: cận dưới ΔAUC -0.0033 >= -0.0020",
+   "logloss_khong_kem: cận trên Δlogloss +0.0023 <= +0.0020",
+   "tot_hon_co_y_nghia: cận trên Δlogloss +0.0023 < 0"
+  ],
+  "checks": {
+   "auc_khong_kem": {
+    "ok": false,
+    "detail": "cận dưới ΔAUC -0.0033 >= -0.0020"
+   },
+   "logloss_khong_kem": {
+    "ok": false,
+    "detail": "cận trên Δlogloss +0.0023 <= +0.0020"
+   },
+   "auc_san": {
+    "ok": true,
+    "detail": "AUC ứng viên 0.7768 >= 0.65"
+   },
+   "muc_canh_bao": {
+    "ok": true,
+    "detail": "Thấp trễ 0.071 (hiện tại 0.074); Cao chính xác 0.596 (hiện tại 0.780)"
+   },
+   "tot_hon_co_y_nghia": {
+    "ok": false,
+    "detail": "cận trên Δlogloss +0.0023 < 0"
+   }
+  },
+  "dry_run": false,
+  "n_excluded_intervened": 0,
+  "n_new_labeled": 18485,
+  "n_new_late": 3432,
+  "missing_feature_share": 0.0,
+  "windows": {
+   "holdout": [
+    "2027-03-05",
+    "2027-06-03"
+   ],
+   "val_start": "2026-12-05",
+   "cur_data_end": "2026-12-02"
+  },
+  "n_holdout": 5419,
+  "n_holdout_late": 860,
+  "n_holdout_lecturers": 311,
+  "candidate_thresholds": [
+   0.16,
+   0.5
+  ],
+  "thresholds_met_on_val": true,
+  "delta": {
+   "auc": [
+    0.0023666450721038235,
+    -0.00327539880261761,
+    0.008257040189874734
+   ],
+   "logloss": [
+    -0.001246308786833128,
+    -0.004574396649642656,
+    0.002279312322919756
+   ],
+   "brier": [
+    -0.0004903114777166789,
+    -0.0016608621901793986,
+    0.0008979625777752571
+   ],
+   "n_boot_ok": 300
+  }
+ },
+ {
+  "as_of": "2028-01-01",
+  "current": "v0003",
+  "promoted": false,
+  "candidate": null,
+  "reasons": [
+   "auc_khong_kem: cận dưới ΔAUC -0.0096 >= -0.0020",
+   "logloss_khong_kem: cận trên Δlogloss +0.0060 <= +0.0020",
+   "tot_hon_co_y_nghia: cận trên Δlogloss +0.0060 < 0"
+  ],
+  "checks": {
+   "auc_khong_kem": {
+    "ok": false,
+    "detail": "cận dưới ΔAUC -0.0096 >= -0.0020"
+   },
+   "logloss_khong_kem": {
+    "ok": false,
+    "detail": "cận trên Δlogloss +0.0060 <= +0.0020"
+   },
+   "auc_san": {
+    "ok": true,
+    "detail": "AUC ứng viên 0.7845 >= 0.65"
+   },
+   "muc_canh_bao": {
+    "ok": true,
+    "detail": "Thấp trễ 0.094 (hiện tại 0.087); Cao chính xác 0.692 (hiện tại 0.768)"
+   },
+   "tot_hon_co_y_nghia": {
+    "ok": false,
+    "detail": "cận trên Δlogloss +0.0060 < 0"
+   }
+  },
+  "dry_run": false,
+  "n_excluded_intervened": 0,
+  "n_new_labeled": 24801,
+  "n_new_late": 4611,
+  "missing_feature_share": 0.0,
+  "windows": {
+   "holdout": [
+    "2027-06-05",
+    "2027-09-03"
+   ],
+   "val_start": "2027-03-07",
+   "cur_data_end": "2026-12-02"
+  },
+  "n_holdout": 5471,
+  "n_holdout_late": 1033,
+  "n_holdout_lecturers": 312,
+  "candidate_thresholds": [
+   0.2,
+   0.57
+  ],
+  "thresholds_met_on_val": true,
+  "delta": {
+   "auc": [
+    -0.0033672494041819823,
+    -0.00959007812069095,
+    0.0024500716336680146
+   ],
+   "logloss": [
+    0.0014233426828116347,
+    -0.0024871270655872635,
+    0.006006272310578871
+   ],
+   "brier": [
+    -0.00023435645250083348,
+    -0.0016741954862535525,
+    0.001285467905054637
+   ],
+   "n_boot_ok": 300
+  }
+ },
+ {
+  "as_of": "2028-04-01",
+  "current": "v0003",
+  "promoted": false,
+  "candidate": null,
+  "reasons": [
+   "auc_khong_kem: cận dưới ΔAUC -0.0062 >= -0.0020",
+   "logloss_khong_kem: cận trên Δlogloss +0.0028 <= +0.0020",
+   "tot_hon_co_y_nghia: cận trên Δlogloss +0.0028 < 0"
+  ],
+  "checks": {
+   "auc_khong_kem": {
+    "ok": false,
+    "detail": "cận dưới ΔAUC -0.0062 >= -0.0020"
+   },
+   "logloss_khong_kem": {
+    "ok": false,
+    "detail": "cận trên Δlogloss +0.0028 <= +0.0020"
+   },
+   "auc_san": {
+    "ok": true,
+    "detail": "AUC ứng viên 0.7785 >= 0.65"
+   },
+   "muc_canh_bao": {
+    "ok": true,
+    "detail": "Thấp trễ 0.081 (hiện tại 0.091); Cao chính xác 0.657 (hiện tại 0.771)"
+   },
+   "tot_hon_co_y_nghia": {
+    "ok": false,
+    "detail": "cận trên Δlogloss +0.0028 < 0"
+   }
+  },
+  "dry_run": false,
+  "n_excluded_intervened": 0,
+  "n_new_labeled": 30731,
+  "n_new_late": 5972,
+  "missing_feature_share": 0.0,
+  "windows": {
+   "holdout": [
+    "2027-09-04",
+    "2027-12-03"
+   ],
+   "val_start": "2027-06-06",
+   "cur_data_end": "2026-12-02"
+  },
+  "n_holdout": 4783,
+  "n_holdout_late": 831,
+  "n_holdout_lecturers": 322,
+  "candidate_thresholds": [
+   0.14,
+   0.5
+  ],
+  "thresholds_met_on_val": true,
+  "delta": {
+   "auc": [
+    0.00022684975421072284,
+    -0.00619414340126499,
+    0.006711191799443608
+   ],
+   "logloss": [
+    -0.001408078481787589,
+    -0.00575795515428314,
+    0.002761751744100357
+   ],
+   "brier": [
+    -0.0006654635123298641,
+    -0.0022576640597835305,
+    0.0007820829594114534
+   ],
+   "n_boot_ok": 300
+  }
+ },
+ {
+  "as_of": "2028-07-01",
+  "current": "v0003",
+  "promoted": true,
+  "candidate": "v0004",
+  "reasons": [],
+  "checks": {
+   "auc_khong_kem": {
+    "ok": true,
+    "detail": "cận dưới ΔAUC +0.0018 >= -0.0020"
+   },
+   "logloss_khong_kem": {
+    "ok": true,
+    "detail": "cận trên Δlogloss -0.0035 <= +0.0020"
+   },
+   "auc_san": {
+    "ok": true,
+    "detail": "AUC ứng viên 0.8059 >= 0.65"
+   },
+   "muc_canh_bao": {
+    "ok": true,
+    "detail": "Thấp trễ 0.081 (hiện tại 0.094); Cao chính xác 0.699 (hiện tại 0.830)"
+   },
+   "tot_hon_co_y_nghia": {
+    "ok": true,
+    "detail": "cận trên Δlogloss -0.0035 < 0"
+   }
+  },
+  "dry_run": false,
+  "n_excluded_intervened": 0,
+  "n_new_labeled": 38211,
+  "n_new_late": 7574,
+  "missing_feature_share": 0.0,
+  "windows": {
+   "holdout": [
+    "2027-12-04",
+    "2028-03-03"
+   ],
+   "val_start": "2027-09-05",
+   "cur_data_end": "2026-12-02"
+  },
+  "n_holdout": 6770,
+  "n_holdout_late": 1501,
+  "n_holdout_lecturers": 327,
+  "candidate_thresholds": [
+   0.14,
+   0.49
+  ],
+  "thresholds_met_on_val": true,
+  "delta": {
+   "auc": [
+    0.006415284097942564,
+    0.0017832957714224301,
+    0.011191609754095513
+   ],
+   "logloss": [
+    -0.007337102541193741,
+    -0.011511197184601312,
+    -0.0034615310722100616
+   ],
+   "brier": [
+    -0.002907115225434964,
+    -0.004333783083642884,
+    -0.0016317686411028939
+   ],
+   "n_boot_ok": 300
+  }
+ },
+ {
+  "as_of": "2028-10-01",
+  "current": "v0004",
+  "promoted": false,
+  "candidate": null,
+  "reasons": [
+   "tot_hon_co_y_nghia: cận trên Δlogloss +0.0003 < 0"
+  ],
+  "checks": {
+   "auc_khong_kem": {
+    "ok": true,
+    "detail": "cận dưới ΔAUC +0.0006 >= -0.0020"
+   },
+   "logloss_khong_kem": {
+    "ok": true,
+    "detail": "cận trên Δlogloss +0.0003 <= +0.0020"
+   },
+   "auc_san": {
+    "ok": true,
+    "detail": "AUC ứng viên 0.8011 >= 0.65"
+   },
+   "muc_canh_bao": {
+    "ok": true,
+    "detail": "Thấp trễ 0.079 (hiện tại 0.088); Cao chính xác 0.615 (hiện tại 0.670)"
+   },
+   "tot_hon_co_y_nghia": {
+    "ok": false,
+    "detail": "cận trên Δlogloss +0.0003 < 0"
+   }
+  },
+  "dry_run": false,
+  "n_excluded_intervened": 0,
+  "n_new_labeled": 17665,
+  "n_new_late": 3833,
+  "missing_feature_share": 0.0,
+  "windows": {
+   "holdout": [
+    "2028-03-05",
+    "2028-06-03"
+   ],
+   "val_start": "2027-12-06",
+   "cur_data_end": "2027-12-03"
+  },
+  "n_holdout": 6067,
+  "n_holdout_late": 1253,
+  "n_holdout_lecturers": 325,
+  "candidate_thresholds": [
+   0.13,
+   0.42
+  ],
+  "thresholds_met_on_val": true,
+  "delta": {
+   "auc": [
+    0.004422787884896695,
+    0.0005673800725475132,
+    0.0084907113156214
+   ],
+   "logloss": [
+    -0.002801979203824023,
+    -0.005777086153154217,
+    0.0002885533787390713
+   ],
+   "brier": [
+    -0.0005133933940212887,
+    -0.0015179532265418721,
+    0.0005738246944351918
+   ],
+   "n_boot_ok": 300
+  }
+ }
+]

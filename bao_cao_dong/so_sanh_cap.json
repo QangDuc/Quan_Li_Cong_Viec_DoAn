@@ -1,0 +1,291 @@
+{
+ "title": "Mô hình động",
+ "dynamic": true,
+ "n_test": 34700,
+ "late_rate": 0.215,
+ "metrics": {
+  "tabpfn": {
+   "roc_auc": 0.84137,
+   "pr_auc": 0.66632,
+   "brier": 0.1127,
+   "logloss": 0.36906,
+   "ece": 0.00536,
+   "recall_at_top20pct": 0.59491,
+   "precision_at_top20pct": 0.63948
+  },
+  "hist_baseline": {
+   "roc_auc": 0.68559,
+   "pr_auc": 0.3759,
+   "brier": 0.1588,
+   "logloss": 0.49516,
+   "ece": 0.05343,
+   "recall_at_top20pct": 0.36595,
+   "precision_at_top20pct": 0.39315
+  },
+  "logistic_base": {
+   "roc_auc": 0.83778,
+   "pr_auc": 0.65435,
+   "brier": 0.11484,
+   "logloss": 0.37563,
+   "ece": 0.01307,
+   "recall_at_top20pct": 0.5874,
+   "precision_at_top20pct": 0.63141
+  },
+  "logistic_spline": {
+   "roc_auc": 0.83867,
+   "pr_auc": 0.66289,
+   "brier": 0.11383,
+   "logloss": 0.37323,
+   "ece": 0.01507,
+   "recall_at_top20pct": 0.59236,
+   "precision_at_top20pct": 0.63674
+  },
+  "catboost": {
+   "roc_auc": 0.83673,
+   "pr_auc": 0.65911,
+   "brier": 0.11432,
+   "logloss": 0.37385,
+   "ece": 0.01047,
+   "recall_at_top20pct": 0.5866,
+   "precision_at_top20pct": 0.63055
+  },
+  "catboost_khong_tien_do": {
+   "roc_auc": 0.81094,
+   "pr_auc": 0.60662,
+   "brier": 0.1238,
+   "logloss": 0.39924,
+   "ece": 0.01056,
+   "recall_at_top20pct": 0.54397,
+   "precision_at_top20pct": 0.58473
+  }
+ },
+ "auc_ci95": {
+  "tabpfn": [
+   0.8292,
+   0.8508
+  ],
+  "hist_baseline": [
+   0.661,
+   0.7029
+  ],
+  "logistic_base": [
+   0.8258,
+   0.8473
+  ],
+  "logistic_spline": [
+   0.8269,
+   0.8481
+  ],
+  "catboost": [
+   0.825,
+   0.8466
+  ],
+  "catboost_khong_tien_do": [
+   0.7988,
+   0.8224
+  ]
+ },
+ "brier_ci95": {
+  "tabpfn": [
+   0.10701,
+   0.1176
+  ],
+  "hist_baseline": [
+   0.148,
+   0.1694
+  ],
+  "logistic_base": [
+   0.10883,
+   0.1202
+  ],
+  "logistic_spline": [
+   0.10802,
+   0.11877
+  ],
+  "catboost": [
+   0.10856,
+   0.11922
+  ],
+  "catboost_khong_tien_do": [
+   0.11737,
+   0.12936
+  ]
+ },
+ "paired_tabpfn_minus": {
+  "hist_baseline": {
+   "d_auc": 0.1571,
+   "d_auc_ci": [
+    0.1411,
+    0.1739
+   ],
+   "d_brier": -0.04619,
+   "d_brier_ci": [
+    -0.0531,
+    -0.03984
+   ],
+   "d_logloss": -0.12646
+  },
+  "logistic_base": {
+   "d_auc": 0.0036,
+   "d_auc_ci": [
+    0.0019,
+    0.0054
+   ],
+   "d_brier": -0.00215,
+   "d_brier_ci": [
+    -0.00284,
+    -0.00149
+   ],
+   "d_logloss": -0.00663
+  },
+  "logistic_spline": {
+   "d_auc": 0.0027,
+   "d_auc_ci": [
+    0.0009,
+    0.0049
+   ],
+   "d_brier": -0.00111,
+   "d_brier_ci": [
+    -0.0018,
+    -0.00047
+   ],
+   "d_logloss": -0.00417
+  },
+  "catboost": {
+   "d_auc": 0.0046,
+   "d_auc_ci": [
+    0.0029,
+    0.0064
+   ],
+   "d_brier": -0.0016,
+   "d_brier_ci": [
+    -0.00224,
+    -0.00094
+   ],
+   "d_logloss": -0.00476
+  },
+  "catboost_khong_tien_do": {
+   "d_auc": 0.0304,
+   "d_auc_ci": [
+    0.0261,
+    0.0347
+   ],
+   "d_brier": -0.01104,
+   "d_brier_ci": [
+    -0.01261,
+    -0.00952
+   ],
+   "d_logloss": -0.03007
+  }
+ },
+ "segments_auc": {
+  "giảng viên mới (<5 việc)": {
+   "n": 306.0,
+   "tabpfn": 0.745,
+   "hist_baseline": 0.474,
+   "logistic_base": 0.753,
+   "logistic_spline": 0.781,
+   "catboost": 0.725,
+   "catboost_khong_tien_do": 0.725
+  },
+  "giảng viên có lịch sử (>=5)": {
+   "n": 34394.0,
+   "tabpfn": 0.841,
+   "hist_baseline": 0.686,
+   "logistic_base": 0.837,
+   "logistic_spline": 0.838,
+   "catboost": 0.837,
+   "catboost_khong_tien_do": 0.811
+  },
+  "mùa cao điểm": {
+   "n": 17546.0,
+   "tabpfn": 0.847,
+   "hist_baseline": 0.686,
+   "logistic_base": 0.841,
+   "logistic_spline": 0.842,
+   "catboost": 0.841,
+   "catboost_khong_tien_do": 0.815
+  },
+  "độ phức tạp cao": {
+   "n": 12825.0,
+   "tabpfn": 0.841,
+   "hist_baseline": 0.687,
+   "logistic_base": 0.837,
+   "logistic_spline": 0.838,
+   "catboost": 0.837,
+   "catboost_khong_tien_do": 0.804
+  },
+  "Khoa K01": {
+   "n": 5837.0,
+   "tabpfn": 0.817,
+   "hist_baseline": 0.646,
+   "logistic_base": 0.811,
+   "logistic_spline": 0.808,
+   "catboost": 0.81,
+   "catboost_khong_tien_do": 0.783
+  },
+  "Khoa K02": {
+   "n": 5710.0,
+   "tabpfn": 0.857,
+   "hist_baseline": 0.683,
+   "logistic_base": 0.856,
+   "logistic_spline": 0.857,
+   "catboost": 0.854,
+   "catboost_khong_tien_do": 0.824
+  },
+  "Khoa K03": {
+   "n": 5165.0,
+   "tabpfn": 0.832,
+   "hist_baseline": 0.699,
+   "logistic_base": 0.828,
+   "logistic_spline": 0.829,
+   "catboost": 0.827,
+   "catboost_khong_tien_do": 0.803
+  },
+  "Khoa K04": {
+   "n": 6368.0,
+   "tabpfn": 0.866,
+   "hist_baseline": 0.722,
+   "logistic_base": 0.863,
+   "logistic_spline": 0.864,
+   "catboost": 0.861,
+   "catboost_khong_tien_do": 0.84
+  },
+  "Khoa K05": {
+   "n": 5896.0,
+   "tabpfn": 0.825,
+   "hist_baseline": 0.705,
+   "logistic_base": 0.825,
+   "logistic_spline": 0.825,
+   "catboost": 0.822,
+   "catboost_khong_tien_do": 0.799
+  },
+  "Khoa K06": {
+   "n": 5724.0,
+   "tabpfn": 0.837,
+   "hist_baseline": 0.643,
+   "logistic_base": 0.833,
+   "logistic_spline": 0.835,
+   "catboost": 0.834,
+   "catboost_khong_tien_do": 0.802
+  },
+  "mốc tiến độ 25%": {
+   "n": 18014.0,
+   "tabpfn": 0.834,
+   "hist_baseline": 0.685,
+   "logistic_base": 0.831,
+   "logistic_spline": 0.832,
+   "catboost": 0.83,
+   "catboost_khong_tien_do": 0.81
+  },
+  "mốc tiến độ 50%": {
+   "n": 16686.0,
+   "tabpfn": 0.848,
+   "hist_baseline": 0.686,
+   "logistic_base": 0.845,
+   "logistic_spline": 0.845,
+   "catboost": 0.844,
+   "catboost_khong_tien_do": 0.811
+  }
+ }
+}

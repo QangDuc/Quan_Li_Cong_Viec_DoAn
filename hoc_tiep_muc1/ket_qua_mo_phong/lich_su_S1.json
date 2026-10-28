@@ -1,0 +1,146 @@
+[
+ {
+  "ts": "2025-12-31 00:00:00",
+  "event": "register",
+  "version": "v0001"
+ },
+ {
+  "ts": "2025-12-31 00:00:00",
+  "event": "promote",
+  "version": "v0001",
+  "previous": null,
+  "reason": "khởi tạo"
+ },
+ {
+  "ts": "2026-04-01 00:00:00",
+  "event": "register",
+  "version": "v0002"
+ },
+ {
+  "ts": "2026-04-01 00:00:00",
+  "event": "promote",
+  "version": "v0002",
+  "previous": "v0001",
+  "reason": "ngây thơ"
+ },
+ {
+  "ts": "2026-07-01 00:00:00",
+  "event": "register",
+  "version": "v0003"
+ },
+ {
+  "ts": "2026-07-01 00:00:00",
+  "event": "promote",
+  "version": "v0003",
+  "previous": "v0002",
+  "reason": "ngây thơ"
+ },
+ {
+  "ts": "2026-10-01 00:00:00",
+  "event": "register",
+  "version": "v0004"
+ },
+ {
+  "ts": "2026-10-01 00:00:00",
+  "event": "promote",
+  "version": "v0004",
+  "previous": "v0003",
+  "reason": "ngây thơ"
+ },
+ {
+  "ts": "2027-01-01 00:00:00",
+  "event": "register",
+  "version": "v0005"
+ },
+ {
+  "ts": "2027-01-01 00:00:00",
+  "event": "promote",
+  "version": "v0005",
+  "previous": "v0004",
+  "reason": "ngây thơ"
+ },
+ {
+  "ts": "2027-04-01 00:00:00",
+  "event": "register",
+  "version": "v0006"
+ },
+ {
+  "ts": "2027-04-01 00:00:00",
+  "event": "promote",
+  "version": "v0006",
+  "previous": "v0005",
+  "reason": "ngây thơ"
+ },
+ {
+  "ts": "2027-07-01 00:00:00",
+  "event": "register",
+  "version": "v0007"
+ },
+ {
+  "ts": "2027-07-01 00:00:00",
+  "event": "promote",
+  "version": "v0007",
+  "previous": "v0006",
+  "reason": "ngây thơ"
+ },
+ {
+  "ts": "2027-10-01 00:00:00",
+  "event": "register",
+  "version": "v0008"
+ },
+ {
+  "ts": "2027-10-01 00:00:00",
+  "event": "promote",
+  "version": "v0008",
+  "previous": "v0007",
+  "reason": "ngây thơ"
+ },
+ {
+  "ts": "2028-01-01 00:00:00",
+  "event": "register",
+  "version": "v0009"
+ },
+ {
+  "ts": "2028-01-01 00:00:00",
+  "event": "promote",
+  "version": "v0009",
+  "previous": "v0008",
+  "reason": "ngây thơ"
+ },
+ {
+  "ts": "2028-04-01 00:00:00",
+  "event": "register",
+  "version": "v0010"
+ },
+ {
+  "ts": "2028-04-01 00:00:00",
+  "event": "promote",
+  "version": "v0010",
+  "previous": "v0009",
+  "reason": "ngây thơ"
+ },
+ {
+  "ts": "2028-07-01 00:00:00",
+  "event": "register",
+  "version": "v0011"
+ },
+ {
+  "ts": "2028-07-01 00:00:00",
+  "event": "promote",
+  "version": "v0011",
+  "previous": "v0010",
+  "reason": "ngây thơ"
+ },
+ {
+  "ts": "2028-10-01 00:00:00",
+  "event": "register",
+  "version": "v0012"
+ },
+ {
+  "ts": "2028-10-01 00:00:00",
+  "event": "promote",
+  "version": "v0012",
+  "previous": "v0011",
+  "reason": "ngây thơ"
+ }
+]

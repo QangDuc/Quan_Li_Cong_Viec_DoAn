@@ -36,7 +36,8 @@ def test_login_and_auth_flow():
     assert len(res_data["predictions"]) > 0
     # Dự đoán trạng thái failed/pending do ML service port 8001 chưa chạy -> Giao việc vẫn thành công
     assert res_data["predictions"][0]["status"] in ["failed", "pending", "ok"]
-    assert "chưa có dự đoán" in (res_data["predictions"][0]["notes"] or "")
+    if res_data["predictions"][0]["status"] != "ok":
+        assert "chưa có dự đoán" in (res_data["predictions"][0]["notes"] or "")
 
 def test_permission_isolation():
     # Giảng viên đăng nhập

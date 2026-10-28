@@ -1,0 +1,15 @@
+{
+  "key_task": "task_type",
+  "prior_rate": 0.2,
+  "prior_strength": 3.0,
+  "n_matrix_cells": 10619,
+  "features_added": [
+    "lecturer_task_count",
+    "lecturer_task_late_rate",
+    "dept_task_late_rate",
+    "lecturer_task_late_lift",
+    "task_matrix_source"
+  ],
+  "output_matrix": "./data/task_personnel_matrix.csv",
+  "output_enriched": "./data/ml_training_set_with_matrix.csv"
+}
