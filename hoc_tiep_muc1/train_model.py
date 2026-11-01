@@ -20,10 +20,9 @@ Quy trình: chia THEO THỜI GIAN 60/15/25 -> chọn siêu tham số trên valid
 Cần: pip install tabpfn   (lần đầu tải trọng số từ Hugging Face; v2.5 trở lên cần chấp nhận giấy phép + HF token)
 """
 import argparse, json, os, warnings
-os.environ.setdefault("OMP_NUM_THREADS", "1")  # Tránh overhead khởi tạo OpenMP (~1.4s) trên Windows khi chạy mô hình nhẹ CPU
+os.environ.setdefault("OMP_NUM_THREADS", "1")  # Tránh overhead khởi tạo OpenMP (~1.4s) trên Windows khi chạy trên CPU
 import numpy as np, pandas as pd, joblib
 import sklearn
-from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.metrics import roc_auc_score, average_precision_score, brier_score_loss, log_loss
 warnings.filterwarnings("ignore")
 
@@ -55,8 +54,7 @@ N_BAGS = 1                # số túi ngữ cảnh độc lập (trung bình xá
 CONTEXT_MODE = "random"   # random: lấy ngẫu nhiên | recent: ưu tiên các dòng mới nhất theo thời gian
 PRED_BATCH = 4000         # số dòng dự đoán mỗi lượt (giới hạn bộ nhớ)
 FIT_MODE = None           # None | low_memory | fit_preprocessors | fit_with_cache (nhanh hơn khi dự đoán nhiều lô cùng ngữ cảnh, tốn bộ nhớ GPU)
-FAST_CPU = False          # True: dùng mô hình nhẹ (HistGradientBoosting 4 túi, phản hồi < 35ms) hoặc tự bật khi máy không có GPU/tabpfn
-FAST_CONTEXT_CAP = 2048   # khi buộc chạy TabPFN trên CPU với --fast-cpu-tabpfn: giới hạn 1 túi x 2048 dòng ngữ cảnh
+CPU_LIGHT_CONTEXT_CAP = 2048   # --cpu-light: chạy TabPFN (không phải mô hình khác) trên CPU với 1 túi x 2048 dòng ngữ cảnh gần nhất; CHƯA đánh giá chất lượng
 # Lưới siêu tham số gọn (chọn theo log-loss validation). TabPFN gần như không cần chỉnh tay.
 PARAM_GRID = [
     dict(n_estimators=8, softmax_temperature=0.9),
@@ -204,7 +202,7 @@ def apply_encoder(enc, X):
 
 def make_tabpfn(params, cat_idx, seed=0):  # noqa
     if TabPFNClassifier is None:
-        raise SystemExit("Chưa cài tabpfn. Chạy: pip install tabpfn (hoặc dùng cờ --fast-cpu để chạy mô hình nhẹ trên CPU)")
+        raise SystemExit("Chưa cài tabpfn. Chạy: pip install tabpfn")
     kw = dict(
         n_estimators=params.get("n_estimators", 8),
         softmax_temperature=params.get("softmax_temperature", 0.9),
@@ -218,43 +216,6 @@ def make_tabpfn(params, cat_idx, seed=0):  # noqa
     if ModelVersion is not None and hasattr(TabPFNClassifier, "create_default_for_version"):
         return TabPFNClassifier.create_default_for_version(ModelVersion(TABPFN_VERSION), **kw)
     return TabPFNClassifier(**kw)
-
-
-def fit_fast_fallback(contexts, cat_idx, X_full=None, y_full=None, seed=0):
-    """Huấn luyện tổ hợp 4 túi HistGradientBoosting siêu nhẹ cho chế độ --fast-cpu (dự đoán + giải thích < 35ms trên CPU)."""
-    if X_full is not None and y_full is not None:
-        Xa, ya = np.asarray(X_full, dtype=np.float32), np.asarray(y_full, dtype=int)
-    else:
-        Xa = np.vstack([c[0] for c in contexts]).astype(np.float32)
-        ya = np.concatenate([c[1] for c in contexts]).astype(int)
-    bags = []
-    n_b = max(2, min(4, len(contexts) if contexts else 4))
-    rng = np.random.default_rng(seed)
-    for b in range(n_b):
-        if X_full is None and len(contexts) > b:
-            Xb, yb = np.asarray(contexts[b][0], dtype=np.float32), np.asarray(contexts[b][1], dtype=int)
-        else:
-            idx = rng.choice(len(Xa), size=int(0.85 * len(Xa)), replace=False)
-            Xb, yb = Xa[idx], ya[idx]
-        clf = HistGradientBoostingClassifier(
-            max_iter=350, learning_rate=0.03, max_leaf_nodes=15, min_samples_leaf=50,
-            l2_regularization=5.0, categorical_features=cat_idx or None,
-            early_stopping=True, validation_fraction=0.1, random_state=seed + b,
-        )
-        clf.fit(Xb, yb)
-        bags.append(clf)
-    return bags
-
-
-def get_fast_models(bundle):
-    """Lấy (hoặc tự động dựng từ ngữ cảnh) tổ hợp mô hình nhẹ CPU trong bundle."""
-    if bundle.get("fast_models"):
-        return bundle["fast_models"]
-    cache = bundle.setdefault("_fast_clf", {})
-    if "bags" not in cache:
-        print("   [fast-cpu] Đang khởi tạo nhanh mô hình nhẹ từ ngữ cảnh đã lưu...", flush=True)
-        cache["bags"] = fit_fast_fallback(bundle["contexts"], bundle.get("cat_idx"), seed=bundle.get("seed", 0))
-    return cache["bags"]
 
 
 def pick_context(n, y, k, seed):
@@ -289,8 +250,6 @@ def get_clf(bundle, k, max_ctx=None):
 
 def prob_detail(model, X, ckpt=None, tag=None):
     """Xác suất trễ hạn: (trung bình các túi, độ lệch chuẩn giữa các túi). Độ lệch = 0 nếu chỉ có 1 túi.
-    Hỗ trợ chế độ --fast-cpu (hoặc tự động chuyển sang fast-cpu khi máy không cài tabpfn):
-      * Dùng tổ hợp 4 túi HistGradientBoosting nhúng sẵn trong risk_model.joblib (phản hồi < 35ms trên CPU).
     Nếu truyền ckpt (thư mục) và tag: mỗi lô (túi, đoạn dòng) được lưu ra đĩa ngay khi tính xong và được nạp lại nếu đã có
     -> dừng giữa chừng rồi chạy lại chỉ mất tối đa một lô."""
     import time
@@ -299,17 +258,7 @@ def prob_detail(model, X, ckpt=None, tag=None):
     if n == 0:
         return np.zeros(0), np.zeros(0)
 
-    use_fast = FAST_CPU or (TabPFNClassifier is None)
-    if use_fast:
-        bags = get_fast_models(model)
-        Xv = Xe.values
-        per_bag = [b.predict_proba(Xv)[:, 1] for b in bags]
-        arr = np.vstack(per_bag)
-        mean = np.clip(arr.mean(axis=0), 1e-4, 1 - 1e-4)
-        sd = arr.std(axis=0) if arr.shape[0] > 1 else np.zeros(n)
-        return mean, sd
-
-    n_bags = 1 if (MAX_CONTEXT and MAX_CONTEXT <= FAST_CONTEXT_CAP and resolve_device() == "cpu" and N_BAGS == 1) else len(model["contexts"])
+    n_bags = 1 if (MAX_CONTEXT and MAX_CONTEXT <= CPU_LIGHT_CONTEXT_CAP and resolve_device() == "cpu" and N_BAGS == 1) else len(model["contexts"])
     ctx_cap = int(MAX_CONTEXT) if MAX_CONTEXT else None
     chunks_per_bag = max(1, -(-n // PRED_BATCH))
     total = n_bags * chunks_per_bag
@@ -410,30 +359,36 @@ def wilson_bounds(k, n, z=1.96):
 
 
 def pick_thresholds(y, p, max_late_low=0.10, min_prec_high=0.60, min_n=30, safety_margin=0.01, min_band=0.05,
-                    cao_top_pct=None):
+                    cao_top_pct=None, safety_margin_high=None):
     """Chọn hai ngưỡng (Thấp | Trung bình | Cao) trên validation, có BIÊN AN TOÀN:
       - Thấp: tỉ lệ trễ của nhóm p < t1 phải <= max_late_low, tính theo CẬN TRÊN 95% (Wilson) cộng thêm safety_margin
               (ngưỡng chọn vừa khít trên một lát validation thường kém đi khi sang giai đoạn sau).
-      - Cao: độ chính xác của nhóm p >= t2 phải >= min_prec_high, tính theo CẬN DƯỚI 95% trừ safety_margin.
+      - Cao: độ chính xác của nhóm p >= t2 phải >= min_prec_high, tính theo CẬN DƯỚI 95% trừ safety_margin_high
+              (mặc định bằng safety_margin; thử lùi theo thời gian cho thấy mức Cao cần biên lớn hơn mức Thấp).
       - Dải 'Trung bình' tối thiểu min_band (nới t1 xuống / t2 lên; việc này chỉ làm hai nhóm biên tinh hơn, không làm mất đảm bảo).
       - cao_top_pct (tuỳ chọn, ví dụ 10): thay t2 bằng ngưỡng để đúng top x% việc rơi vào 'Cao' (theo năng lực xử lý).
     Trả về (ngưỡng, đạt_mục_tiêu)."""
     y = np.asarray(y)
     p = np.asarray(p)
+    sm_hi = safety_margin if safety_margin_high is None else safety_margin_high
     grid = np.linspace(0.02, 0.95, 94)
     t1 = t2 = None
     for t in grid:
         s_ = p < t
         n = int(s_.sum())
-        if n >= min_n and wilson_bounds(int(y[s_].sum()), n)[1] + safety_margin <= max_late_low:
+        if n < min_n:
+            continue
+        if wilson_bounds(int(y[s_].sum()), n)[1] + safety_margin <= max_late_low:
             t1 = float(t)
+        else:
+            break      # dừng ở lần vi phạm đầu tiên: không nhảy sang ngưỡng lớn hơn chỉ vì nhiễu làm đạt lại
     if cao_top_pct:
         t2 = float(np.quantile(p, 1 - cao_top_pct / 100.0))
     else:
         for t in grid:
             s_ = p >= t
             n = int(s_.sum())
-            if n >= min_n and wilson_bounds(int(y[s_].sum()), n)[0] - safety_margin >= min_prec_high:
+            if n >= min_n and wilson_bounds(int(y[s_].sum()), n)[0] - sm_hi >= min_prec_high:
                 t2 = float(t)
                 break
     if t1 is None or t2 is None:
@@ -554,11 +509,7 @@ def explain(m, X, k_up=3, k_down=2, min_effect=0.02):
         blocks.append(Xb)
     big = pd.concat(blocks, ignore_index=True)
     big._is_encoded = True
-    if FAST_CPU or (TabPFNClassifier is None):
-        # Dùng túi đầu tiên khi tính Δlogit giải thích để phản hồi < 45ms mà vẫn giữ đúng thứ hạng yếu tố
-        lg = logit(get_fast_models(m)[0].predict_proba(big.values)[:, 1])
-    else:
-        lg = logit(prob(m, big))
+    lg = logit(prob(m, big))
     l0 = lg[:n]
     C = pd.DataFrame({f: l0 - lg[(j + 1) * n:(j + 2) * n] for j, (f, _) in enumerate(units)})
     out = []
@@ -646,8 +597,8 @@ def make_meta(df_all, trva_mask, cols, args_used):
 
 
 def slim(bundle):
-    """Bản để lưu: bỏ các bộ phân loại TabPFN đã dựng (sẽ dựng lại từ ngữ cảnh khi nạp); giữ lại fast_models cho --fast-cpu."""
-    return {k: v for k, v in bundle.items() if k not in ("_clf", "_fast_clf")}
+    """Bản để lưu: bỏ các bộ phân loại TabPFN đã dựng (sẽ dựng lại từ ngữ cảnh khi nạp)."""
+    return {k: v for k, v in bundle.items() if k not in ("_clf", "_fast_clf", "fast_models")}
 
 
 _nn = lambda v: None if v != v else round(float(v), 4)
@@ -686,15 +637,13 @@ def train(a):
 
 
 def _train(a):
-    for k, v in dict(max_late_low=0.10, min_prec_high=0.60, safety_margin=0.01, min_band=0.05, cao_top_pct=None,
-                     resume=False, keep_checkpoint=False, pool="train", allow_fallback=False).items():
+    for k, v in dict(max_late_low=0.10, min_prec_high=0.60, safety_margin=0.01, min_band=0.05, cao_top_pct=None, safety_margin_high=None,
+                     resume=False, keep_checkpoint=False, pool="train").items():
         if not hasattr(a, k):
             setattr(a, k, v)
-    use_tabpfn = not (FAST_CPU or TabPFNClassifier is None)
-    if not use_tabpfn and not a.allow_fallback:
-        raise SystemExit("[DỪNG] Không dùng được TabPFN (chưa cài tabpfn hoặc đang bật --fast-cpu). Huấn luyện mô hình chính cần TabPFN + GPU "
-                         "(pip install tabpfn; Colab T4). Nếu CHỦ ĐÍCH huấn luyện bản nhẹ HistGradientBoosting thì thêm --allow-fallback; "
-                         "kết quả sẽ được ghi nhãn là HistGradientBoosting, không phải TabPFN.")
+    if TabPFNClassifier is None:
+        raise SystemExit("[DỪNG] Chưa cài tabpfn. Huấn luyện mô hình chính cần TabPFN + GPU (pip install tabpfn; Colab T4).")
+    use_tabpfn = True
     df = engineer(pd.read_csv(a.data, parse_dates=["assigned_date"])).sort_values("assigned_date").reset_index(drop=True)
     y = df[LABEL].astype(int).values
     X = df.drop(columns=[c for c in ID_COLS + TARGETS if c in df.columns])
@@ -791,13 +740,6 @@ def _train(a):
         m_main = m_tr
     else:
         m_main = fit_model(X.loc[trva, cols], y[trva], params=best_params)   # cách cũ: dựng lại từ train+validation
-    if not use_tabpfn:
-        # CHẾ ĐỘ DỰ PHÒNG (--allow-fallback): mô hình chính là HistGradientBoosting, huấn luyện CHỈ trên tập train để ngưỡng/đánh giá nhất quán
-        print("   [fallback] Mô hình chính = HistGradientBoosting 4 túi (KHÔNG phải TabPFN), huấn luyện trên tập train...", flush=True)
-        Xe_fit = apply_encoder(m_main["encoder"], X.loc[fit_mask, cols]).values
-        m_main["fast_models"] = fit_fast_fallback(m_main["contexts"], m_main.get("cat_idx"), X_full=Xe_fit, y_full=y[fit_mask], seed=m_main.get("seed", 0))
-        p_va = prob_detail(m_main, X.loc[va, cols])[0]
-        val_ll = log_loss(y[va], p_va)
     p_te, sd_te = prob_detail(m_main, X.loc[te, cols], ckpt=None if (a.prune or not use_tabpfn) else ckpt, tag="te")
     res = metrics(y[te], p_te)
     grp = df.loc[te, "lecturer_id"].values if "lecturer_id" in df.columns else None
@@ -806,7 +748,8 @@ def _train(a):
 
     # ngưỡng trên validation (mô hình chỉ thấy train)
     thr, ok = pick_thresholds(y[va], p_va, max_late_low=a.max_late_low, min_prec_high=a.min_prec_high,
-                              safety_margin=a.safety_margin, min_band=a.min_band, cao_top_pct=a.cao_top_pct)
+                              safety_margin=a.safety_margin, min_band=a.min_band, cao_top_pct=a.cao_top_pct,
+                              safety_margin_high=a.safety_margin_high)
     levels = levels_from(thr)
 
     print(f"\nMÔ HÌNH CHÍNH: TabPFN {TABPFN_VERSION} | params = {best_params} | log-loss validation = {val_ll:.4f}")
@@ -875,27 +818,6 @@ def _train(a):
         pt["risk_uncertainty"] = np.round(sd_te, 5)
     pt.to_csv(f"{a.out}/predictions_test.csv", index=False, encoding="utf-8-sig")
 
-    # --- mô hình nhẹ cho --fast-cpu (HistGradientBoosting): huấn luyện trên train+validation, ĐO RIÊNG trên test ---
-    fast_info = None
-    if "fast_models" not in m_main:
-        print("Đang huấn luyện kèm tổ hợp mô hình nhẹ (HistGradientBoosting 4 túi) cho chế độ --fast-cpu...", flush=True)
-        Xe_trva = apply_encoder(m_main["encoder"], X.loc[trva, cols]).values
-        m_main["fast_models"] = fit_fast_fallback(m_main["contexts"], m_main.get("cat_idx"), X_full=Xe_trva, y_full=y[trva], seed=m_main.get("seed", 0))
-    if use_tabpfn:
-        Xe_te = apply_encoder(m_main["encoder"], X.loc[te, cols]).values
-        pf = np.clip(np.mean([b.predict_proba(Xe_te)[:, 1] for b in m_main["fast_models"]], axis=0), 1e-4, 1 - 1e-4)
-        rf = metrics(y[te], pf)
-        lvf = pd.DataFrame({"level": [level_of(v, levels) for v in pf], "y": y[te]}).groupby("level").y.agg(["count", "mean"]).reindex(LEVEL_NAMES)
-        from scipy.stats import spearmanr
-        fast_info = dict(
-            note="Mô hình nhẹ HistGradientBoosting 4 túi dùng cho --fast-cpu (demo web). KHÔNG phải TabPFN; huấn luyện trên train+validation.",
-            test={k: round(float(v), 4) for k, v in rf.items()},
-            alert_levels_with_main_thresholds={k: dict(n=int(0 if r["count"] != r["count"] else r["count"]),
-                                                      late_rate=(None if r["count"] != r["count"] else round(float(r["mean"]), 4)))
-                                              for k, r in lvf.iterrows()},
-            spearman_vs_main=round(float(spearmanr(pf, p_te)[0]), 4))
-        print("\n=== MÔ HÌNH NHẸ --fast-cpu (HGB) TRÊN TEST (so với mô hình chính) ===\n"
-              f"AUC {rf['roc_auc']:.4f} | PR-AUC {rf['pr_auc']:.4f} | Brier {rf['brier']:.4f} | ECE {rf['ece']:.4f} | Spearman với TabPFN {fast_info['spearman_vs_main']:.3f}")
     meta = make_meta(df, fit_mask, cols, dict(pool=a.pool, n_bags=N_BAGS, max_context=context_limit(), context_mode=CONTEXT_MODE,
                                               tabpfn_version=(TABPFN_VERSION if use_tabpfn else None), no_tune=bool(a.no_tune),
                                               backend=("tabpfn" if use_tabpfn else "hist_gradient_boosting")))
@@ -907,7 +829,6 @@ def _train(a):
             tabpfn_version=(TABPFN_VERSION if use_tabpfn else None),
             device=resolve_device(),
             pool=a.pool,
-            fast_cpu=fast_info,
             context=dict(max_context=context_limit(), n_bags=N_BAGS, mode=CONTEXT_MODE,
                          n_rows_in_context=int(len(m_main["contexts"][0][1]))),
             hyperparams=best_params,
@@ -917,7 +838,7 @@ def _train(a):
             test_auc_ci95_method="bootstrap theo cụm giảng viên",
             test_auc_ci95_by_row=[round(c, 4) for c in ci_rows],
             threshold_config=dict(max_late_low=a.max_late_low, min_prec_high=a.min_prec_high, safety_margin=a.safety_margin,
-                                  min_band=a.min_band, cao_top_pct=a.cao_top_pct),
+                                  safety_margin_high=a.safety_margin_high, min_band=a.min_band, cao_top_pct=a.cao_top_pct),
             thresholds=thr,
             thresholds_from_target_precision=ok,
             pruned_groups=pruned,
@@ -938,14 +859,10 @@ def _train(a):
         indent=2,
     )
     base = baseline_values(X.loc[fit_mask, cols])
-    if "fast_models" not in m_main:
-        print("Đang huấn luyện kèm tổ hợp mô hình nhẹ (HistGradientBoosting 4 túi) cho chế độ --fast-cpu...", flush=True)
-        Xe_trva = apply_encoder(m_main["encoder"], X.loc[trva, cols]).values
-        m_main["fast_models"] = fit_fast_fallback(m_main["contexts"], m_main.get("cat_idx"), X_full=Xe_trva, y_full=y[trva], seed=m_main.get("seed", 0))
     out = slim(m_main)
     out.update(levels=levels, thresholds=thr, baseline=base, meta=meta)
     joblib.dump(out, f"{a.out}/risk_model.joblib", compress=3)
-    print(f"\nĐã lưu ngữ cảnh + bộ mã hóa + fast_models + báo cáo vào {os.path.abspath(a.out)}")
+    print(f"\nĐã lưu ngữ cảnh + bộ mã hóa + báo cáo vào {os.path.abspath(a.out)}")
     if not a.keep_checkpoint:
         import shutil
         shutil.rmtree(ckpt, ignore_errors=True)
@@ -998,8 +915,9 @@ def predict(a):
     meta = m.get("meta")
     is_dyn = "progress_pct" in m.get("features", [])
     model_tag = "MÔ HÌNH ĐỘNG (cập nhật theo % tiến độ)" if is_dyn else "MÔ HÌNH TĨNH (lúc mới giao việc)"
-    use_fast = FAST_CPU or (TabPFNClassifier is None)
-    mode_str = f"{model_tag} | CHẾ ĐỘ NHANH CPU (--fast-cpu < 35ms)" if use_fast else f"{model_tag} | TabPFN {m.get('tabpfn_version', '?')} ({len(m['contexts'])} túi)"
+    if TabPFNClassifier is None:
+        raise SystemExit("[DỪNG] Chưa cài tabpfn: mô hình này chạy bằng TabPFN (pip install tabpfn; GPU được khuyến nghị).")
+    mode_str = f"{model_tag} | TabPFN {m.get('tabpfn_version', '?')} ({len(m['contexts'])} túi)"
     if meta:
         print(f"Mô hình: {mode_str} | huấn luyện {meta['trained_at'][:10]} trên dữ liệu "
               f"{meta['data_start']} -> {meta['data_end']} ({meta['n_rows']:,} dòng)")
@@ -1031,7 +949,7 @@ def predict(a):
     out = eng[[c for c in ID_COLS + dyn_cols if c in eng.columns]].copy()
     out["risk_probability"] = p.round(3)
     out["risk_level"] = [level_of(v, m["levels"]) for v in p]
-    if len(m["contexts"]) > 1 or use_fast:
+    if len(m["contexts"]) > 1:
         out["risk_uncertainty"] = sd.round(3)      # độ lệch chuẩn giữa các túi: càng lớn mô hình càng không chắc
     notes = [[] for _ in range(len(X))]
     hc = X["hist_count"] if "hist_count" in X.columns else pd.Series(np.nan, index=X.index)
@@ -1063,21 +981,19 @@ def predict(a):
 
 
 def configure(a):
-    """Nhận cấu hình TabPFN và chế độ --fast-cpu từ dòng lệnh."""
-    global TABPFN_VERSION, DEVICE, MAX_CONTEXT, N_BAGS, CONTEXT_MODE, FAST_CPU, FIT_MODE
+    """Nhận cấu hình TabPFN từ dòng lệnh."""
+    global TABPFN_VERSION, DEVICE, MAX_CONTEXT, N_BAGS, CONTEXT_MODE, FIT_MODE
     if getattr(a, "tabpfn_version", None):
         TABPFN_VERSION = a.tabpfn_version
     DEVICE = getattr(a, "device", "auto") or "auto"
     MAX_CONTEXT = getattr(a, "max_context", None)
     N_BAGS = getattr(a, "n_bags", 1) or 1
     CONTEXT_MODE = getattr(a, "context_mode", "random") or "random"
-    FAST_CPU = bool(getattr(a, "fast_cpu", False))
     FIT_MODE = getattr(a, "fit_mode", None) or None
-    if getattr(a, "fast_cpu_tabpfn", False):
-        # Chế độ rút gọn ngữ cảnh TabPFN xuống 1 túi x 2048 dòng khi vẫn muốn chạy mạng TabPFN trên CPU
-        FAST_CPU = False
+    if getattr(a, "cpu_light", False):
+        # Chế độ rút gọn ngữ cảnh TabPFN xuống 1 túi x 2048 dòng khi chạy mạng TabPFN trên CPU (chưa đánh giá chất lượng)
         DEVICE = "cpu"
-        MAX_CONTEXT = FAST_CONTEXT_CAP
+        MAX_CONTEXT = CPU_LIGHT_CONTEXT_CAP
         N_BAGS = 1
 
 
@@ -1088,10 +1004,8 @@ def add_tabpfn_args(p):
     p.add_argument("--n-bags", type=int, default=1, help="số túi ngữ cảnh độc lập, lấy trung bình xác suất")
     p.add_argument("--context-mode", default="random", choices=["random", "recent"])
     p.add_argument("--fit-mode", default=None, choices=["low_memory", "fit_preprocessors", "fit_with_cache"], help="chế độ lưu đệm của TabPFN; fit_with_cache nhanh hơn nhưng tốn bộ nhớ GPU (thử ở MODE quick trước)")
-    p.add_argument("--fast-cpu", action="store_true",
-                   help="chạy mô hình nhẹ (HistGradientBoosting 4 túi nhúng trong joblib) trên CPU với độ trễ < 35ms để demo Web tức thì")
-    p.add_argument("--fast-cpu-tabpfn", action="store_true",
-                   help="chạy TabPFN trên CPU nhưng tự động rút gọn ngữ cảnh xuống 1 túi x 2.048 dòng gần nhất")
+    p.add_argument("--cpu-light", action="store_true",
+                   help="chạy TabPFN trên CPU với ngữ cảnh rút gọn (1 túi x 2.048 dòng gần nhất); chất lượng chưa được đánh giá")
 
 
 if __name__ == "__main__":
@@ -1102,7 +1016,6 @@ if __name__ == "__main__":
     t.add_argument("--out", default="./model")
     t.add_argument("--prune", action="store_true", help="loại các nhóm đặc trưng không giúp ích trên validation (chậm)")
     t.add_argument("--pool", default="train", choices=["train", "trainval"], help="nguồn ngữ cảnh của mô hình cuối: train (mặc định, nhất quán với ngưỡng chọn trên validation) hoặc trainval")
-    t.add_argument("--allow-fallback", action="store_true", help="cho phép huấn luyện bản nhẹ HistGradientBoosting khi không có TabPFN (kết quả được ghi nhãn đúng là HGB)")
     t.add_argument("--resume", action="store_true", help="tiếp tục từ điểm lưu trong <out>/checkpoint nếu cấu hình và dữ liệu không đổi")
     t.add_argument("--keep-checkpoint", action="store_true", help="giữ lại thư mục điểm lưu sau khi huấn luyện xong")
     t.add_argument("--no-tune", action="store_true", help="bỏ chọn siêu tham số, dùng cấu hình đầu tiên (nhanh)")
@@ -1110,6 +1023,7 @@ if __name__ == "__main__":
     t.add_argument("--max-late-low", type=float, default=0.10, help="mục tiêu: nhóm 'Thấp' có tỉ lệ trễ tối đa")
     t.add_argument("--min-prec-high", type=float, default=0.60, help="mục tiêu: nhóm 'Cao' có độ chính xác tối thiểu")
     t.add_argument("--safety-margin", type=float, default=0.01, help="biên an toàn khi chọn ngưỡng (đề phòng lệch giữa validation và giai đoạn sau)")
+    t.add_argument("--safety-margin-high", type=float, default=None, help="biên an toàn RIÊNG cho mức Cao (mặc định = --safety-margin)")
     t.add_argument("--min-band", type=float, default=0.05, help="độ rộng tối thiểu của dải 'Trung bình'")
     t.add_argument("--cao-top-pct", type=float, default=None, help="(tuỳ chọn) đặt ngưỡng 'Cao' để đúng top x%% việc rơi vào nhóm Cao theo năng lực xử lý")
     add_tabpfn_args(t)

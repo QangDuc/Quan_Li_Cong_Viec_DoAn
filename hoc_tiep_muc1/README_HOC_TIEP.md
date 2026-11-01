@@ -4,6 +4,8 @@ Gói `hoc_tiep/` cho phép mô hình cải thiện từ dữ liệu vận hành 
 Đây là hướng "huấn luyện lại định kỳ có kiểm soát", không phải học từng mẫu (không dùng học trực tuyến, ADWIN hay chạy bóng; đó là mức 3).
 
 ## 1. Thành phần
+
+Lưu ý: mô hình HistGradientBoosting trong `model_backend.py` chỉ là backend thử nghiệm để mô phỏng và kiểm thử quy trình học tiếp trên CPU; nó **không** thuộc mô hình được triển khai (mô hình triển khai là TabPFN). `train_model.py` kèm theo là bản đã gỡ chế độ `--fast-cpu`.
 | Tệp | Vai trò |
 |---|---|
 | `feedback_store.py` | Kho SQLite: dự đoán đã đưa ra (kèm đặc trưng **lúc giao việc**), kết quả thật khi hoàn thành, can thiệp. Chỉ giữ dự đoán đầu tiên của mỗi việc; không lưu nhãn trong đặc trưng. |
@@ -12,14 +14,15 @@ Gói `hoc_tiep/` cho phép mô hình cải thiện từ dữ liệu vận hành 
 | `compare.py` | So cặp theo cụm giảng viên (ΔAUC, Δlogloss, ΔBrier, KTC 95%), thống kê mức cảnh báo, `pick_thresholds` (bản sao của `train_model`, có kiểm thử khớp). |
 | `serving.py` | `RiskService.predict`: dùng `CURRENT`, tự ghi nhật ký, tự nạp lại khi `CURRENT` đổi. |
 | `cli.py` | `init, predict, outcome, retrain [--dry-run], status, rollback, export, compare`. |
-| `tests/test_hoc_tiep.py` | 11 kiểm thử (dữ liệu tổng hợp). `python tests/test_hoc_tiep.py` |
+| `monitor.py` | Giám sát mức 2 (`Level2Monitor`, lệnh `cli monitor`): hiệu chuẩn, SLO mức Thấp/Cao, PSI của phân phối dự đoán. Cảnh báo dựa trên khoảng Wilson và z-test, cần tối thiểu 1.000 việc có nhãn trong cửa sổ. |
+| `tests/test_hoc_tiep.py` | 15 kiểm thử (dữ liệu tổng hợp), gồm báo động giả và khả năng phát hiện của monitor. `python tests/test_hoc_tiep.py` |
 | `simulate_operation.py` | Mô phỏng vận hành 11 quý trên bộ `du_lieu_co_dinh_v2`. |
 
 ## 2. Luồng mỗi lần huấn luyện lại (`as_of` = ngày chạy)
 1. Lấy việc **đã có nhãn tại `as_of`** (hoàn thành và đã ghi nhận). Việc chưa xong không có mặt: đó là độ trễ nhãn.
 2. Chỉ việc **đã chín** (giao trước `as_of - maturity_days`, mặc định 120 ngày) được dùng cho cửa sổ kiểm tra. Lý do: trên bộ v2, thời gian giao → hoàn thành có trung vị 6 ngày nhưng P90 = 90 ngày và P95 = 170 ngày **[đo]**; việc mới giao mà đã xong sớm phần lớn đúng hạn, nên tỉ lệ trễ của việc "mới có nhãn" bị lệch thấp.
 3. Cửa sổ so sánh (holdout, 90 ngày) chỉ gồm việc giao **sau dữ liệu cuối của mô hình hiện tại** để mô hình hiện tại chưa thấy.
-4. Ứng viên: mô hình phụ huấn luyện trước cửa sổ chọn ngưỡng (90 ngày) → chọn ngưỡng Thấp/Trung bình/Cao bằng `pick_thresholds` (cùng mục tiêu: Thấp trễ ≤ 10%, Cao chính xác ≥ 60%); ứng viên huấn luyện đến hết trước holdout và dùng ngưỡng đó. **Không chỉnh ngưỡng hay cấu hình bằng holdout.**
+4. Ứng viên: mô hình phụ huấn luyện trước cửa sổ chọn ngưỡng (90 ngày) → chọn ngưỡng Thấp/Trung bình/Cao bằng `pick_thresholds` (cùng mục tiêu: Thấp trễ ≤ 10%, Cao chính xác ≥ 60%; biên an toàn **0,01 cho mức Thấp và 0,03 cho mức Cao**, chọn bằng thử lùi theo thời gian chỉ trên dữ liệu train và validation của `v2`); ứng viên huấn luyện đến hết trước holdout và dùng ngưỡng đó. **Không chỉnh ngưỡng hay cấu hình bằng holdout.**
 5. Các rào chắn (`Config`):
    | Nhóm | Điều kiện để nâng cấp |
    |---|---|
@@ -40,7 +43,7 @@ python -m hoc_tiep.cli rollback --registry registry --reason "..."
 Đặt `train_model.py` cạnh gói (có sẵn) để dùng đúng `engineer`/`restore_dups` của dịch vụ; không có thì gói dùng bản sao tối thiểu và kết quả có thể lệch nhẹ.
 
 ## 4. Kết quả mô phỏng vận hành [đo, 1 bộ dữ liệu mô phỏng, 1 lần chạy, mô hình HistGradientBoosting trên CPU]
-M� hình đầu chỉ học việc **hoàn thành trước 2026-01-01** (34.789 việc, trễ 17,0%); 2026Q1–2028Q3 (11 quý, 63.023 việc, trễ 20,6%) dự đoán bằng phiên bản đang chạy rồi huấn luyện lại cuối mỗi quý. Mọi dự đoán được đánh giá bằng phiên bản đã đưa ra dự đoán đó.
+M� hình đầu chỉ học việc **hoàn thành trước 2026-01-01** (34.789 việc, trễ 17,0%); 2026Q1–2028Q3 (11 quý, 63.023 việc, trễ 20,6%) dự đoán bằng phiên bản đang chạy rồi huấn luyện lại cuối mỗi quý. Mọi dự đoán được đánh giá bằng phiên bản đã đưa ra dự đoán đó.
 | Chiến lược | AUC | Logloss | Brier | ECE | Dự đoán TB (thật 0,206) | Thấp: % số việc / tỉ lệ trễ | Cao: % số việc / chính xác | Số phiên bản đã dùng |
 |---|---|---|---|---|---|---|---|---|
 | S0 giữ nguyên | 0,7821 | 0,4179 | 0,1299 | 0,0217 | 0,187 | 61,3% / 9,3% | 5,4% / 74,8% | 1 |
@@ -65,7 +68,7 @@ Gói tự huấn luyện lại, đăng ký phiên bản và quay lại cho mô h
 2. Huấn luyện trên Colab bằng `train_model.py` như lần B → thu được `predictions` của ứng viên.
 3. Lấy dự đoán của mô hình hiện tại trên **cùng các dòng holdout** (việc giao sau dữ liệu cuối của mô hình hiện tại, đã chín).
 4. `python -m hoc_tiep.cli compare --input du_doan.csv --thr-current a,b --thr-candidate c,d` (cột `y, p_current, p_candidate, lecturer_id`) áp đúng các rào chắn chất lượng; đạt thì thay `model/` trong dịch vụ và ghi lại thủ công.
-Chưa có: đăng ký phiên bản TabPFN trong kho, quay lại tự động cho TabPFN.
+Mục 5 mô tả đường bán thủ công. **Đường tự động cho TabPFN (GPU) có ở mục 8**, thay thế các bước thủ công này.
 
 ## 6. Kiểm thử đơn vị (dữ liệu tổng hợp) đã chứng minh
 Kho phản hồi tôn trọng `as_of` và thời điểm ghi nhận (không rò nhãn tương lai), giữ dự đoán đầu tiên, không lưu nhãn trong đặc trưng; loại việc đã can thiệp khi `intervention_policy="exclude"`; kho phiên bản không ghi đè, phát hiện file bị sửa, quay lại nhiều bước và dịch vụ tự nạp lại; so cặp cho Δ = 0 khi hai mô hình giống nhau; từ chối khi thiếu dữ liệu hoặc tỉ lệ trễ bất thường; nâng cấp khi quy luật thật sự đổi; không nâng cấp khi hai mô hình ngang nhau; chạy khô không đổi gì; danh mục chưa gặp và giá trị thiếu không làm lỗi dự đoán.
@@ -77,5 +80,47 @@ Kho phản hồi tôn trọng `as_of` và thời điểm ghi nhận (không rò 
 - **An toàn tệp mô hình**: `.joblib` là pickle; SHA-256 chỉ phát hiện sửa đổi sau khi đăng ký (không chứng minh nguồn gốc). Chỉ nạp từ thư mục kho do bạn kiểm soát; ghim scikit-learn (phiên bản huấn luyện được ghi trong `meta.json`, nạp lệch sẽ cảnh báo).
 - **Đồng thời**: SQLite một người ghi; không có khóa cho hai `retrain` chạy cùng lúc.
 - **Chưa tích hợp vào `task_risk_service`** vì chưa có mã của dịch vụ. Cần: (a) thay đường nạp mô hình cố định bằng `ModelRegistry.load()`/`RiskService`; (b) gọi `log_predictions` sau mỗi dự đoán (đặc trưng phải là bản đã tính **lúc giao việc**, gồm cả đặc trưng ma trận); (c) thêm điểm ghi kết quả (`record_outcomes`) khi việc hoàn thành; (d) lập lịch `retrain` (ví dụ cuối quý) và hiển thị phiên bản đang chạy.
-- Chưa có: giám sát lệch phân phối và hiệu chuẩn theo tháng, lập lịch, mô hình động (`kind='dyn25'/'dyn50'` được lưu nhưng chưa mô phỏng), học trực tuyến theo mẫu.
+- `monitor.py` có sẵn nhưng chưa được lập lịch hay tích hợp vào web. Cửa sổ giám sát tính theo ngày hoàn thành nên tỉ lệ trễ của cửa sổ gần nhất có thể lệch thấp (việc trễ hoàn thành muộn hơn); với cửa sổ dưới 1.000 việc có nhãn, monitor chỉ báo thiếu dữ liệu. Đo bằng mô phỏng (hiệu chuẩn hoàn hảo, phân phối xác suất thật của TabPFN): báo động giả tối đa 0,7% ở cửa sổ từ 1.000 việc; phát hiện 100% khi dự đoán lệch thực tế từ 4 điểm phần trăm (61% khi lệch 2 điểm) với cửa sổ 3.000 việc.
+- Chưa có: lập lịch, mô hình động (`kind='dyn25'/'dyn50'` được lưu nhưng chưa mô phỏng), học trực tuyến theo mẫu.
 - Siêu tham số HGB cố định (`DEFAULT_HGB`); việc chọn siêu tham số là việc ngoại tuyến, không làm trong mỗi lần huấn luyện lại.
+
+
+## 8. Chế độ TỰ ĐỘNG cho TabPFN (máy có GPU, chạy hằng quý)
+TabPFN không cập nhật trọng số: "huấn luyện lại" chỉ là chọn túi dòng ngữ cảnh mới, nên rẻ. Chi phí nằm ở suy luận (chọn ngưỡng trên cửa sổ validation và so sánh trên holdout), cần GPU. Từ nhật ký huấn luyện (~85 ms/dòng/T4 với 4 túi), ước tính 30 đến 60 phút mỗi lần chạy với vài nghìn dòng; **chưa đo trên máy của bạn**.
+
+### Thành phần mới
+| Tệp | Vai trò |
+|---|---|
+| `hoc_tiep/tabpfn_backend.py` | `TabPFNBackend` (fit = chọn ngữ cảnh + mã hóa; predict = trung bình các túi), `import_service_bundle` (đăng ký `model/risk_model.joblib` làm phiên bản đầu). Gói mô hình là dict thuần nên dịch vụ nạp được mà không cần import `hoc_tiep`. |
+| `hoc_tiep/auto_job.py` | `run_auto`: khóa job, huấn luyện lại + so sánh + rào chắn, chờ dịch vụ nạp phiên bản mới, **tự quay lại nếu dịch vụ không nạp được**, ghi `registry/last_decision.json`. |
+| `service/ml_service.py` | `ML_REGISTRY_DIR`: nạp phiên bản CURRENT của kho; tự nạp lại khi CURRENT đổi (ở `/health` và `/predict`); nạp phiên bản mới lỗi thì **giữ mô hình đang chạy**; `/reload` (cần `ML_ADMIN_TOKEN`). |
+| `service/hoc_tiep_hook.py` + `ml_client.py` | Backend ghi dự đoán (đặc trưng lúc giao việc) và kết quả thật vào kho phản hồi. No-op nếu không đặt `HOC_TIEP_DB`. |
+
+### Thiết lập một lần
+```
+cd hoc_tiep_mlops
+python -m hoc_tiep.cli import-tabpfn --registry /srv/ml/registry --input ../model/risk_model.joblib      # phiên bản đầu v0001
+# dịch vụ ML:
+ML_ENGINE=tabpfn ML_REGISTRY_DIR=/srv/ml/registry ML_ADMIN_TOKEN=<mã bí mật> TABPFN_DEVICE=cuda uvicorn ml_service:app --port 8001
+# backend web:
+HOC_TIEP_DB=/srv/ml/feedback.db   HOC_TIEP_PATH=/duong/dan/hoc_tiep_mlops      # bật ghi phản hồi
+```
+Backend cần gọi thêm `hoc_tiep_hook.record_outcome(task_id, lecturer_id, completed_at, is_late)` khi phân công hoàn thành (`is_late` = hoàn thành sau hạn GỐC) và `record_intervention(...)` khi quản lý can thiệp. Việc gọi `log_prediction` đã được thêm vào `ml_client.py`.
+
+### Lịch hằng quý
+```
+# cron (02:00 ngày 2 của tháng 1, 4, 7, 10)
+0 2 2 1,4,7,10 *  cd /srv/ml/hoc_tiep_mlops && python -m hoc_tiep.cli retrain-auto --registry /srv/ml/registry --store /srv/ml/feedback.db \
+    --base /srv/ml/data/ml_training_set_with_matrix.csv --mode auto --service-url http://localhost:8001 --config /srv/ml/hoc_tiep.json >> /srv/ml/retrain.log 2>&1
+```
+Windows: Task Scheduler, trình kích hoạt "Hằng tháng" (tháng 1, 4, 7, 10; ngày 2), hành động chạy cùng lệnh. Mã thoát: 0 thành công (kể cả giữ nguyên), 2 lỗi, 3 đang có job khác chạy.
+**Khuyến nghị:** hai quý đầu chạy `--mode dry-run` (mặc định) để xem quyết định trong `last_decision.json` rồi mới đổi sang `--mode auto`.
+
+### Điều chỉnh rào chắn theo lượng việc thật (RẤT QUAN TRỌNG)
+Rào chắn mặc định (holdout ≥ 2.000 dòng, ≥ 200 việc trễ) theo quy mô bộ mô phỏng (360 giảng viên). Với một khoa vài chục giảng viên (ước tính ~2.000 đến 4.000 việc mỗi năm, dựa trên giả định 38 việc/giảng viên/năm của bộ sinh), cửa sổ 90 ngày chỉ có vài trăm dòng và job sẽ luôn trả lời "chưa đủ việc mới" (an toàn, nhưng không bao giờ nâng cấp). Hạ ngưỡng bằng `--config` (ví dụ `{"min_holdout_rows": 400, "min_holdout_late": 60, "min_holdout_lecturers": 20, "min_new_labeled": 600, "min_new_late": 80, "holdout_days": 180}`); cửa sổ nhỏ thì khoảng tin cậy rộng, nên rào chắn "tốt hơn có ý nghĩa" sẽ hiếm khi đạt: đó là hành vi mong muốn khi dữ liệu ít.
+Độ trễ nhãn: việc phải "chín" 120 ngày (`maturity_days`), cộng cửa sổ so sánh và cửa sổ chọn ngưỡng, nên lần nâng cấp có ý nghĩa đầu tiên thường sau vài quý vận hành.
+Dữ liệu nền là dữ liệu mô phỏng; khi dữ liệu thật tích lũy đủ nên giảm dần hoặc bỏ phần mô phỏng khỏi `--base`.
+
+### Đã kiểm thử (TabPFN GIẢ dựa trên HistGradientBoosting; 6 kiểm thử trong `tests/test_tabpfn_auto.py`)
+Backend fit/predict và lưu không kèm đối tượng TabPFN; đăng ký mô hình hiện tại và dịch vụ nạp từ kho; nâng cấp và quay lại làm dịch vụ tự nạp lại; phiên bản hỏng (SHA-256 sai) thì dịch vụ giữ mô hình cũ; `/reload` cần mã; dry-run không đổi gì rồi auto nâng cấp khi quy luật đổi; tự quay lại khi dịch vụ không nạp được; khóa chặn hai job cùng lúc; móc ghi dự đoán và kết quả.
+**Chưa kiểm chứng:** TabPFN thật (thời gian chạy, bộ nhớ GPU khi nạp 4 túi hai lần), chạy với dữ liệu thật, và việc nạp lại ngay trong `/health` có thể làm yêu cầu đó chờ hàng chục giây khi nạp 4 túi TabPFN (job chờ tối đa `--wait-timeout`, mặc định 120 giây; tăng nếu cần).

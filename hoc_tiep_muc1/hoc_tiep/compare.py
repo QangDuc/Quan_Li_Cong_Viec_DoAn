@@ -16,22 +16,27 @@ def wilson_bounds(k, n, z=1.96):
     return float(c - h), float(c + h)
 
 
-def pick_thresholds(y, p, max_late_low=0.10, min_prec_high=0.60, min_n=30, safety_margin=0.01, min_band=0.05, cao_top_pct=None):
+def pick_thresholds(y, p, max_late_low=0.10, min_prec_high=0.60, min_n=30, safety_margin=0.01, min_band=0.05, cao_top_pct=None, safety_margin_high=None):
     y = np.asarray(y); p = np.asarray(p)
+    sm_hi = safety_margin if safety_margin_high is None else safety_margin_high
     grid = np.linspace(0.02, 0.95, 94)
     t1 = t2 = None
     for t in grid:
         s_ = p < t
         n = int(s_.sum())
-        if n >= min_n and wilson_bounds(int(y[s_].sum()), n)[1] + safety_margin <= max_late_low:
+        if n < min_n:
+            continue
+        if wilson_bounds(int(y[s_].sum()), n)[1] + safety_margin <= max_late_low:
             t1 = float(t)
+        else:
+            break      # dừng ở lần vi phạm đầu tiên (giống train_model.pick_thresholds)
     if cao_top_pct:
         t2 = float(np.quantile(p, 1 - cao_top_pct / 100.0))
     else:
         for t in grid:
             s_ = p >= t
             n = int(s_.sum())
-            if n >= min_n and wilson_bounds(int(y[s_].sum()), n)[0] - safety_margin >= min_prec_high:
+            if n >= min_n and wilson_bounds(int(y[s_].sum()), n)[0] - sm_hi >= min_prec_high:
                 t2 = float(t)
                 break
     if t1 is None or t2 is None:

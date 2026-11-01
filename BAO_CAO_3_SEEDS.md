@@ -1,35 +1,45 @@
-# BÁO CÁO THỰC NGHIỆM NHÂN BẢN NHIỀU SEED (3 BỘ DỮ LIỆU)
+# Nhân bản trên nhiều seed: mô hình đối chứng CPU
 
-Thời điểm thực hiện: 2026-10-29  
-Cấu hình dữ liệu: 360 giảng viên x 6 Khoa x 5 năm (Pipeline v2 căn cứ bảng định mức HUIT)
+Ngày xuất: 2026-10-31. Dữ liệu mô phỏng (cùng bộ sinh `gen_synthetic_data_v5.py`, 360 giảng viên, 6 Khoa, 5 năm; chỉ đổi seed). Mô hình đối chứng huấn luyện trên tập train, chọn siêu tham số trên validation, đo trên test. **TabPFN không nằm trong báo cáo này** (cần GPU; xem notebook theo seed).
 
-## 1. Thông số 3 bộ dữ liệu độc lập
+## 1. Các bộ dữ liệu
 
-| Đặc tính dữ liệu | Seed 42 (Cơ sở) | Seed 43 (Kiểm chứng 1) | Seed 44 (Kiểm chứng 2) |
-| :--- | :---: | :---: | :---: |
-| **Quy mô mẫu tĩnh** | 99.765 dòng | 96.570 dòng | 100.260 dòng |
-| - Train (<= 60%) | 59.966 dòng | 57.973 dòng | 60.210 dòng |
-| - Validation (60%-75%) | 14.891 dòng | 14.521 dòng | 15.016 dòng |
-| - Test (> 75%) | 24.908 dòng | 24.076 dòng | 25.034 dòng |
-| **Tỷ lệ trễ thực tế tập Test** | 21,72% | 21,53% | 20,36% |
-| **Quy mô mẫu động (checkpoint)** | 129.116 dòng | 126.328 dòng | 130.864 dòng |
-| **File đóng gói GPU Colab** | `du_lieu_co_dinh_v2.zip` | `du_lieu_seed_43.zip` | `du_lieu_seed_44.zip` |
+| | Seed 42 | Seed 43 | Seed 44 |
+|---|---|---|---|
+| Gói dữ liệu | `du_lieu_co_dinh_v2` | `du_lieu_co_dinh_v2_seed43` | `du_lieu_co_dinh_v2_seed44` |
+| Số dòng tĩnh | 99.765 | 96.570 | 100.260 |
+| Train / Validation / Test | 59.966 / 14.891 / 24.908 | 57.973 / 14.521 / 24.076 | 60.210 / 15.016 / 25.034 |
+| Tỉ lệ trễ train / validation / test | 18,86% / 19,17% / 21,72% | 19,49% / 21,83% / 21,53% | 19,15% / 19,55% / 20,36% |
+| Số dòng động | 129.116 | 126.328 | 130.864 |
 
----
+## 2. ROC-AUC trên tập test (tĩnh)
 
-## 2. Kết quả Đánh giá Mô hình CPU (Tập Test, Mean ± Std)
+| Mô hình | Seed 42 | Seed 43 | Seed 44 | Trung bình ± độ lệch chuẩn mẫu |
+|---|---|---|---|---|
+| Hồi quy Logistic | 0,8072 | 0,8145 | 0,8158 | 0,8125 ± 0,0046 |
+| Hồi quy Logistic + Spline | 0,8083 | 0,8165 | 0,8134 | 0,8127 ± 0,0041 |
+| CatBoost | 0,8095 | 0,8167 | 0,8154 | 0,8139 ± 0,0038 |
+| **Trần oracle (biết yếu tố ẩn)** | 0,8261 | 0,8337 | 0,8295 | 0,8298 ± 0,0038 |
 
-Tất cả mô hình được huấn luyện trên tập Train, chọn siêu tham số tối ưu trên Validation và đánh giá độc lập trên tập Test chưa từng nhìn thấy:
+## 3. Các chỉ số khác (trung bình ± độ lệch chuẩn mẫu qua các seed)
 
-| Mô hình | ROC-AUC (Seed 42) | ROC-AUC (Seed 43) | ROC-AUC (Seed 44) | ROC-AUC (Mean ± Std) | PR-AUC (Mean ± Std) | Brier Score (Mean ± Std) | ECE (Mean ± Std) |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Hồi quy Logistic (Chuẩn)** | 0,8072 | 0,8145 | 0,8158 | **0.8125 ± 0.0038** | 0.6005 ± 0.0108 | 0.1234 ± 0.0032 | 0.0113 ± 0.0009 |
-| **Hồi quy Logistic + Spline** | 0,8083 | 0,8165 | 0,8134 | **0.8127 ± 0.0034** | 0.6025 ± 0.0130 | 0.1238 ± 0.0029 | 0.0219 ± 0.0101 |
-| **CatBoost (Cây quyết định)** | 0,8097 | 0,8168 | 0,8152 | **0.8139 ± 0.0030** | 0.6040 ± 0.0110 | 0.1230 ± 0.0027 | 0.0119 ± 0.0059 |
+| Mô hình | PR-AUC | Brier | ECE |
+|---|---|---|---|
+| Hồi quy Logistic | 0,6005 ± 0,0133 | 0,1234 ± 0,0039 | 0,0113 ± 0,0011 |
+| Hồi quy Logistic + Spline | 0,6025 ± 0,0159 | 0,1238 ± 0,0035 | 0,0219 ± 0,0123 |
+| CatBoost | 0,6033 ± 0,0130 | 0,1230 ± 0,0035 | 0,0125 ± 0,0067 |
 
----
+## 4. Nhận xét (tính từ số liệu ở trên)
 
-## 3. Nhận xét Khoa học
-1. **Tính ổn định cực cao**: Độ lệch chuẩn giữa các seed rất nhỏ (Std ROC-AUC chỉ ~0,003 đến 0,004), chứng minh bộ đặc trưng 58 cột và ma trận tác vụ-nhân sự có tính ổn định tuyệt vời trên nhiều phân phối giả lập khác nhau.
-2. **Khắc phục Data Snooping**: Việc đánh giá độc lập trên Seed 43 và Seed 44 xác nhận mô hình hoàn toàn không bị overfitting hay rò rỉ thông tin từ tập test cũ của Seed 42.
-3. **Thứ hạng mô hình nhất quán**: CatBoost luôn đạt ROC-AUC cao nhất trên cả 3 seed (trung bình 0,8139), bám sát phía sau là Logistic Spline và Logistic Base.
+1. **Thứ hạng không nhất quán:** mô hình có AUC cao nhất là seed 42: CatBoost; seed 43: CatBoost; seed 44: Hồi quy Logistic.
+2. **Mức chênh giữa ba mô hình rất nhỏ:** AUC lớn nhất trừ nhỏ nhất trong mỗi seed là seed 42: 0,0023; seed 43: 0,0022; seed 44: 0,0024. CatBoost trừ logistic: seed 42: +0,0023; seed 43: +0,0022; seed 44: -0,0004.
+3. **Khoảng cách tới trần oracle:** Hồi quy Logistic 0,0173 ± 0,0031; Hồi quy Logistic + Spline 0,0170 ± 0,0009; CatBoost 0,0159 ± 0,0015. Khoảng cách này gần như bằng nhau giữa các mô hình, nên đổi họ mô hình ít thu hẹp được nó.
+4. **Độ biến thiên giữa các seed:** độ lệch chuẩn của AUC khoảng 0,0042. Độ lệch này gồm cả khác biệt giữa các bộ dữ liệu sinh ra (khác tập test, khác tỉ lệ trễ), không chỉ nhiễu của mô hình.
+
+## 5. Hạn chế
+
+- Chỉ 3 seed: ước lượng độ lệch chuẩn từ 3 điểm rất thiếu chính xác; không có kiểm định thống kê giữa các mô hình trong báo cáo này.
+- Chỉ có mô hình CPU. Kết luận về TabPFN (so với CatBoost, logistic) cần chạy TabPFN trên từng seed (GPU).
+- Cùng một bộ sinh và cùng giả định mô phỏng; nhân bản theo seed chỉ kiểm tra độ nhạy với ngẫu nhiên của bộ sinh, không kiểm tra tính đúng đắn của giả định.
+- Việc đạt kết quả tương tự trên các seed không chứng minh mô hình không rò rỉ hay không overfit; rò rỉ (nếu có) do quy trình sinh đặc trưng sẽ lặp lại ở mọi seed.
+- Tập test của seed 42 đã được xem nhiều lần trong quá trình phát triển; seed 43 và 44 dùng làm nhân bản.

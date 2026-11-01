@@ -19,7 +19,8 @@ def build_bundle(backend, feats, df_a, df_val, df_final, cfg, data_end, seed=0):
     if len(df_val) >= 300:
         pipe_a = backend.fit(Xa, ya, seed)
         pv = backend.predict({"pipeline": pipe_a, "features": feats}, prepare_features(df_val, feats))
-        thr, ok = pick_thresholds(df_val.is_late.values, pv, cfg.max_late_low, cfg.min_prec_high)
+        thr, ok = pick_thresholds(df_val.is_late.values, pv, cfg.max_late_low, cfg.min_prec_high,
+                                 safety_margin=cfg.safety_margin, safety_margin_high=cfg.safety_margin_high)
     pipe = backend.fit(prepare_features(df_final, feats), df_final.is_late.values, seed)
     return dict(backend=backend.name, pipeline=pipe, features=feats, thresholds=thr, thresholds_met_on_val=bool(ok),
                 data_end=str(pd.Timestamp(df_final.assigned_date.max()).date()), n_train=int(len(df_final)))

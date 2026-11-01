@@ -20,32 +20,41 @@ Quy trình: chia THEO THỜI GIAN 60/15/25 -> chọn siêu tham số trên valid
 Cần: pip install tabpfn   (lần đầu tải trọng số từ Hugging Face; v2.5 trở lên cần chấp nhận giấy phép + HF token)
 """
 import argparse, json, os, warnings
+os.environ.setdefault("OMP_NUM_THREADS", "1")  # Tránh overhead khởi tạo OpenMP (~1.4s) trên Windows khi chạy trên CPU
 import numpy as np, pandas as pd, joblib
+import sklearn
 from sklearn.metrics import roc_auc_score, average_precision_score, brier_score_loss, log_loss
 warnings.filterwarnings("ignore")
 
 try:
     import torch
+except ImportError:
+    torch = None
+
+try:
     from tabpfn import TabPFNClassifier
     try:
         from tabpfn.constants import ModelVersion
     except Exception:  # bản tabpfn cũ không có ModelVersion
         ModelVersion = None
-except ImportError as e:
-    raise SystemExit("Chưa cài tabpfn. Chạy: pip install tabpfn\n" + str(e))
+except ImportError:
+    TabPFNClassifier = None
+    ModelVersion = None
 
 ID_COLS = ["task_id", "lecturer_id", "faculty", "assigned_date"]
 TARGETS = ["is_late", "late_vs_original_deadline", "late_vs_current_deadline"]
 LABEL = "is_late"
 LEVEL_NAMES = ["Thấp", "Trung bình", "Cao"]
 DEFAULT_THR = (0.20, 0.50)
-# Cấu hình TabPFN (đặt bằng tham số dòng lệnh; xem main)
+# Cấu hình TabPFN & chế độ CPU nhanh (đặt bằng tham số dòng lệnh; xem main)
 TABPFN_VERSION = "v2"     # v2 (mở, không cần đăng nhập) | v2.5 | v2.6 | ... (cần chấp nhận giấy phép trên Hugging Face)
 DEVICE = "auto"           # auto | cpu | cuda
 MAX_CONTEXT = None        # số dòng ngữ cảnh tối đa mỗi túi; None -> 10.000 (v2 hoặc CPU) / 50.000 (v2.5+ trên GPU)
 N_BAGS = 1                # số túi ngữ cảnh độc lập (trung bình xác suất)
 CONTEXT_MODE = "random"   # random: lấy ngẫu nhiên | recent: ưu tiên các dòng mới nhất theo thời gian
 PRED_BATCH = 4000         # số dòng dự đoán mỗi lượt (giới hạn bộ nhớ)
+FIT_MODE = None           # None | low_memory | fit_preprocessors | fit_with_cache (nhanh hơn khi dự đoán nhiều lô cùng ngữ cảnh, tốn bộ nhớ GPU)
+CPU_LIGHT_CONTEXT_CAP = 2048   # --cpu-light: chạy TabPFN (không phải mô hình khác) trên CPU với 1 túi x 2048 dòng ngữ cảnh gần nhất; CHƯA đánh giá chất lượng
 # Lưới siêu tham số gọn (chọn theo log-loss validation). TabPFN gần như không cần chỉnh tay.
 PARAM_GRID = [
     dict(n_estimators=8, softmax_temperature=0.9),
@@ -104,7 +113,46 @@ def engineer(df):
         df["complexity_num"] = df.complexity.map({"Thấp": 0, "Trung bình": 1, "Cao": 2})
     if "priority" in df:
         df["priority_num"] = df.priority.map({"Thấp": 0, "Trung bình": 1, "Cao": 2, "Khẩn cấp": 3})
+    # Tự động tính bổ sung các cột tiến độ động (dynamic progress) nếu người dùng chỉ truyền progress_pct và days_elapsed
+    if "progress_pct" in df.columns or "checkpoint_fraction" in df.columns:
+        if "days_elapsed" in df.columns and "available_days" in df.columns:
+            avail = df["available_days"].clip(lower=1)
+            if "days_remaining" not in df.columns:
+                df["days_remaining"] = (avail - df["days_elapsed"]).clip(lower=0)
+            if "checkpoint_fraction" not in df.columns:
+                df["checkpoint_fraction"] = (df["days_elapsed"] / avail).round(2)
+            if "expected_progress_pct" not in df.columns:
+                df["expected_progress_pct"] = (100.0 * df["days_elapsed"] / avail).clip(0, 100).round(1)
+        elif "checkpoint_fraction" in df.columns and "available_days" in df.columns:
+            avail = df["available_days"].clip(lower=1)
+            if "days_elapsed" not in df.columns:
+                df["days_elapsed"] = np.maximum(1, np.round(df["checkpoint_fraction"] * avail)).astype(int)
+            if "days_remaining" not in df.columns:
+                df["days_remaining"] = (avail - df["days_elapsed"]).clip(lower=0)
+            if "expected_progress_pct" not in df.columns:
+                df["expected_progress_pct"] = (100.0 * df["days_elapsed"] / avail).clip(0, 100).round(1)
+        if "progress_pct" in df.columns:
+            if "progress_missing" not in df.columns:
+                df["progress_missing"] = df["progress_pct"].isna().astype(int)
+            if "expected_progress_pct" in df.columns and "progress_gap" not in df.columns:
+                df["progress_gap"] = (df["progress_pct"] - df["expected_progress_pct"]).round(1)
+    # Ba cờ "thiếu lịch sử" trùng hệt is_cold_start (tương quan = 1,0) -> bỏ bớt để tránh đặc trưng lặp
+    if "is_cold_start" in df:
+        for c in DUP_FLAGS:
+            if c in df and df[c].equals(df["is_cold_start"]):
+                df = df.drop(columns=[c])
     return df
+
+
+DUP_FLAGS = ["hist_avg_delay_missing", "hist_early_rate_missing", "hist_late_last5_missing"]
+
+
+def restore_dups(eng, features):
+    """Mô hình cũ có thể còn các cờ trùng lặp trong danh sách đặc trưng: khôi phục từ is_cold_start để dự đoán không bị lệch."""
+    for c in features:
+        if c in DUP_FLAGS and c not in eng.columns and "is_cold_start" in eng.columns:
+            eng[c] = eng["is_cold_start"]
+    return eng
 
 
 def split_cols(X):
@@ -115,7 +163,7 @@ def split_cols(X):
 def resolve_device():
     if DEVICE != "auto":
         return DEVICE
-    return "cuda" if torch.cuda.is_available() else "cpu"
+    return "cuda" if (torch is not None and torch.cuda.is_available()) else "cpu"
 
 
 def context_limit():
@@ -137,6 +185,8 @@ def fit_encoder(X):
 
 
 def apply_encoder(enc, X):
+    if getattr(X, "_is_encoded", False):
+        return X
     out = pd.DataFrame(index=X.index)
     for c in enc["order"]:
         if c not in X.columns:
@@ -145,10 +195,14 @@ def apply_encoder(enc, X):
             out[c] = X[c].map(lambda v, m=enc["maps"][c]: m.get(str(v), np.nan) if v == v and v is not None else np.nan)
         else:
             out[c] = pd.to_numeric(X[c], errors="coerce")
-    return out.astype(np.float32)
+    res = out.astype(np.float32)
+    res._is_encoded = True
+    return res
 
 
-def make_tabpfn(params, cat_idx, seed=0):
+def make_tabpfn(params, cat_idx, seed=0):  # noqa
+    if TabPFNClassifier is None:
+        raise SystemExit("Chưa cài tabpfn. Chạy: pip install tabpfn")
     kw = dict(
         n_estimators=params.get("n_estimators", 8),
         softmax_temperature=params.get("softmax_temperature", 0.9),
@@ -157,6 +211,8 @@ def make_tabpfn(params, cat_idx, seed=0):
         ignore_pretraining_limits=True,
         random_state=seed,
     )
+    if FIT_MODE:
+        kw["fit_mode"] = FIT_MODE
     if ModelVersion is not None and hasattr(TabPFNClassifier, "create_default_for_version"):
         return TabPFNClassifier.create_default_for_version(ModelVersion(TABPFN_VERSION), **kw)
     return TabPFNClassifier(**kw)
@@ -177,26 +233,33 @@ def pick_context(n, y, k, seed):
     return np.sort(rng.choice(n, size=lim, replace=False))
 
 
-def get_clf(bundle, k):
+def get_clf(bundle, k, max_ctx=None):
     """Dựng (lười) bộ phân loại TabPFN cho túi k từ ngữ cảnh đã lưu; cache trong bundle['_clf']."""
     cache = bundle.setdefault("_clf", {})
-    if k not in cache:
+    ckey = (k, max_ctx)
+    if ckey not in cache:
         Xc, yc = bundle["contexts"][k]
+        if max_ctx and len(Xc) > max_ctx:
+            # lấy các dòng cuối (gần nhất theo thời gian vì ngữ cảnh đã sort)
+            Xc, yc = Xc[-max_ctx:], yc[-max_ctx:]
         clf = make_tabpfn(bundle["hyperparams"], bundle["cat_idx"], seed=bundle.get("seed", 0) + k)
         clf.fit(Xc, yc)
-        cache[k] = clf
-    return cache[k]
+        cache[ckey] = clf
+    return cache[ckey]
 
 
 def prob_detail(model, X, ckpt=None, tag=None):
     """Xác suất trễ hạn: (trung bình các túi, độ lệch chuẩn giữa các túi). Độ lệch = 0 nếu chỉ có 1 túi.
-    Độ lệch giữa các túi là thước đo độ KHÔNG CHẮC CHẮN của mô hình (ngữ cảnh khác nhau cho kết quả khác nhau).
     Nếu truyền ckpt (thư mục) và tag: mỗi lô (túi, đoạn dòng) được lưu ra đĩa ngay khi tính xong và được nạp lại nếu đã có
     -> dừng giữa chừng rồi chạy lại chỉ mất tối đa một lô."""
     import time
     Xe = apply_encoder(model["encoder"], X)
     n = len(Xe)
-    n_bags = len(model["contexts"])
+    if n == 0:
+        return np.zeros(0), np.zeros(0)
+
+    n_bags = 1 if (MAX_CONTEXT and MAX_CONTEXT <= CPU_LIGHT_CONTEXT_CAP and resolve_device() == "cpu" and N_BAGS == 1) else len(model["contexts"])
+    ctx_cap = int(MAX_CONTEXT) if MAX_CONTEXT else None
     chunks_per_bag = max(1, -(-n // PRED_BATCH))
     total = n_bags * chunks_per_bag
     per_bag = []
@@ -212,7 +275,7 @@ def prob_detail(model, X, ckpt=None, tag=None):
                 n_cached += 1
                 continue
             if clf is None:
-                clf = get_clf(model, k)
+                clf = get_clf(model, k, max_ctx=ctx_cap)
             part = clf.predict_proba(Xe.iloc[i:i + PRED_BATCH].values)[:, 1]
             if path:
                 tmp = path + ".tmp.npy"
@@ -296,30 +359,36 @@ def wilson_bounds(k, n, z=1.96):
 
 
 def pick_thresholds(y, p, max_late_low=0.10, min_prec_high=0.60, min_n=30, safety_margin=0.01, min_band=0.05,
-                    cao_top_pct=None):
+                    cao_top_pct=None, safety_margin_high=None):
     """Chọn hai ngưỡng (Thấp | Trung bình | Cao) trên validation, có BIÊN AN TOÀN:
       - Thấp: tỉ lệ trễ của nhóm p < t1 phải <= max_late_low, tính theo CẬN TRÊN 95% (Wilson) cộng thêm safety_margin
               (ngưỡng chọn vừa khít trên một lát validation thường kém đi khi sang giai đoạn sau).
-      - Cao: độ chính xác của nhóm p >= t2 phải >= min_prec_high, tính theo CẬN DƯỚI 95% trừ safety_margin.
+      - Cao: độ chính xác của nhóm p >= t2 phải >= min_prec_high, tính theo CẬN DƯỚI 95% trừ safety_margin_high
+              (mặc định bằng safety_margin; thử lùi theo thời gian cho thấy mức Cao cần biên lớn hơn mức Thấp).
       - Dải 'Trung bình' tối thiểu min_band (nới t1 xuống / t2 lên; việc này chỉ làm hai nhóm biên tinh hơn, không làm mất đảm bảo).
       - cao_top_pct (tuỳ chọn, ví dụ 10): thay t2 bằng ngưỡng để đúng top x% việc rơi vào 'Cao' (theo năng lực xử lý).
     Trả về (ngưỡng, đạt_mục_tiêu)."""
     y = np.asarray(y)
     p = np.asarray(p)
+    sm_hi = safety_margin if safety_margin_high is None else safety_margin_high
     grid = np.linspace(0.02, 0.95, 94)
     t1 = t2 = None
     for t in grid:
         s_ = p < t
         n = int(s_.sum())
-        if n >= min_n and wilson_bounds(int(y[s_].sum()), n)[1] + safety_margin <= max_late_low:
+        if n < min_n:
+            continue
+        if wilson_bounds(int(y[s_].sum()), n)[1] + safety_margin <= max_late_low:
             t1 = float(t)
+        else:
+            break      # dừng ở lần vi phạm đầu tiên: không nhảy sang ngưỡng lớn hơn chỉ vì nhiễu làm đạt lại
     if cao_top_pct:
         t2 = float(np.quantile(p, 1 - cao_top_pct / 100.0))
     else:
         for t in grid:
             s_ = p >= t
             n = int(s_.sum())
-            if n >= min_n and wilson_bounds(int(y[s_].sum()), n)[0] - safety_margin >= min_prec_high:
+            if n >= min_n and wilson_bounds(int(y[s_].sum()), n)[0] - sm_hi >= min_prec_high:
                 t2 = float(t)
                 break
     if t1 is None or t2 is None:
@@ -360,6 +429,9 @@ NAMES.update({
     "converted_workload_missing": "thiếu giờ chuẩn quy đổi", "hist_avg_delay_missing": "thiếu số ngày trễ TB trước đây",
     "hist_early_rate_missing": "thiếu tỉ lệ làm sớm trước đây", "hist_late_last5_missing": "thiếu tỉ lệ trễ 5 việc gần nhất",
     "is_cold_start": "giảng viên mới (ít lịch sử)",
+    "progress_pct": "tiến độ đã đạt (%)", "expected_progress_pct": "tiến độ kỳ vọng (%)",
+    "days_elapsed": "số ngày đã thực hiện", "days_remaining": "số ngày còn lại tới hạn",
+    "checkpoint_fraction": "mốc kiểm tra tiến độ",
 })
 
 
@@ -375,8 +447,28 @@ def fmt(v):
     return str(v)
 
 
-# Các đặc trưng thực chất là một yếu tố (bản chữ + bản số) -> gộp khi giải thích, hiển thị bản đầu tiên
-EXPLAIN_MERGE = {"complexity": ["complexity_num"], "priority": ["priority_num"]}
+def fmt_feat(X, i, f):
+    """Hiển thị tên và giá trị đặc trưng; nếu progress_gap bị thiếu do chưa cập nhật tiến độ thì ghi rõ."""
+    val = X.at[i, f]
+    if f == "progress_gap" and (val is None or (isinstance(val, (float, np.floating)) and val != val)):
+        if "progress_missing" in X.columns and X.at[i, "progress_missing"] == 1:
+            return "chưa cập nhật tiến độ = 1"
+    return f"{NAMES.get(f, f)} = {fmt(val)}"
+
+
+# Các đặc trưng thực chất là một yếu tố (bản chữ + bản số, hoặc giá trị + cờ báo thiếu / cold-start) -> gộp khi giải thích
+EXPLAIN_MERGE = {
+    "complexity": ["complexity_num"],
+    "priority": ["priority_num"],
+    "converted_workload": ["converted_workload_missing"],
+    "hist_avg_delay": ["hist_avg_delay_missing"],
+    "hist_early_rate": ["hist_early_rate_missing"],
+    "hist_late_last5": ["hist_late_last5_missing"],
+    "hist_count": ["is_cold_start"],
+    "lecturer_task_count": ["task_matrix_source"],
+    "progress_gap": ["progress_pct", "progress_missing"],
+    "checkpoint_fraction": ["expected_progress_pct", "days_elapsed", "days_remaining"],
+}
 
 
 def explain(m, X, k_up=3, k_down=2, min_effect=0.02):
@@ -399,13 +491,24 @@ def explain(m, X, k_up=3, k_down=2, min_effect=0.02):
         p = np.clip(p, 1e-4, 1 - 1e-4)
         return np.log(p / (1 - p))
 
-    blocks = [X]
+    # Mã hóa X và baseline một lần sang dạng số trước khi nhân bản 50 khối -> tăng tốc suy luận + giải thích gấp ~30 lần (< 35ms)
+    enc = m["encoder"]
+    Xe0 = apply_encoder(enc, X)
+    base_df = pd.DataFrame([{k: baseline.get(k, np.nan) for k in enc["order"]}])
+    base_enc = apply_encoder(enc, base_df).iloc[0]
+
+    blocks = [Xe0]
     for f, cols in units:
-        Xb = X.copy()
+        Xb = Xe0.copy()
         for c in cols:
-            Xb[c] = baseline[c]
+            if c in Xb.columns:
+                Xb[c] = base_enc[c]
+        # giữ tính nhất quán của hiệu số ma trận khi thay lecturer_task_late_rate hoặc dept_task_late_rate về baseline
+        if f in ("lecturer_task_late_rate", "dept_task_late_rate") and {"lecturer_task_late_rate", "dept_task_late_rate", "lecturer_task_late_lift"} <= set(Xb.columns):
+            Xb["lecturer_task_late_lift"] = Xb["lecturer_task_late_rate"] - Xb["dept_task_late_rate"]
         blocks.append(Xb)
     big = pd.concat(blocks, ignore_index=True)
+    big._is_encoded = True
     lg = logit(prob(m, big))
     l0 = lg[:n]
     C = pd.DataFrame({f: l0 - lg[(j + 1) * n:(j + 2) * n] for j, (f, _) in enumerate(units)})
@@ -414,7 +517,7 @@ def explain(m, X, k_up=3, k_down=2, min_effect=0.02):
         row = C.iloc[i].sort_values(ascending=False)
         up = row[row > min_effect].head(k_up)
         down = row[row < -min_effect].sort_values().head(k_down)
-        txt = lambda s: "; ".join(f"{NAMES.get(f, f)} = {fmt(X.at[i, f])}" for f in s.index)
+        txt = lambda s: "; ".join(fmt_feat(X, i, f) for f in s.index)
         parts = []
         if len(up):
             parts.append("Tăng rủi ro (so với mức điển hình): " + txt(up))
@@ -488,14 +591,14 @@ def make_meta(df_all, trva_mask, cols, args_used):
         trained_at=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
         data_start=str(d.min().date()), data_end=str(d.max().date()), n_rows=int(trva_mask.sum()),
         n_features=len(cols), feature_schema=list(cols),
-        versions=dict(python=platform.python_version(), tabpfn=tp_ver, torch=getattr(torch, "__version__", "?")),
+        versions=dict(python=platform.python_version(), tabpfn=str(tp_ver), torch=str(getattr(torch, "__version__", "?")), sklearn=sklearn.__version__),
         settings=args_used,
     )
 
 
 def slim(bundle):
     """Bản để lưu: bỏ các bộ phân loại TabPFN đã dựng (sẽ dựng lại từ ngữ cảnh khi nạp)."""
-    return {k: v for k, v in bundle.items() if k != "_clf"}
+    return {k: v for k, v in bundle.items() if k not in ("_clf", "_fast_clf", "fast_models")}
 
 
 _nn = lambda v: None if v != v else round(float(v), 4)
@@ -534,10 +637,13 @@ def train(a):
 
 
 def _train(a):
-    for k, v in dict(max_late_low=0.10, min_prec_high=0.60, safety_margin=0.01, min_band=0.05, cao_top_pct=None,
-                     resume=False, keep_checkpoint=False).items():
+    for k, v in dict(max_late_low=0.10, min_prec_high=0.60, safety_margin=0.01, min_band=0.05, cao_top_pct=None, safety_margin_high=None,
+                     resume=False, keep_checkpoint=False, pool="train").items():
         if not hasattr(a, k):
             setattr(a, k, v)
+    if TabPFNClassifier is None:
+        raise SystemExit("[DỪNG] Chưa cài tabpfn. Huấn luyện mô hình chính cần TabPFN + GPU (pip install tabpfn; Colab T4).")
+    use_tabpfn = True
     df = engineer(pd.read_csv(a.data, parse_dates=["assigned_date"])).sort_values("assigned_date").reset_index(drop=True)
     y = df[LABEL].astype(int).values
     X = df.drop(columns=[c for c in ID_COLS + TARGETS if c in df.columns])
@@ -627,9 +733,14 @@ def _train(a):
                 pruned = []
                 print(f"   -> bỏ đồng thời làm xấu đi ({d:+.4f}), giữ đầy đủ đặc trưng")
 
-    # Dựng ngữ cảnh cuối từ train+validation (dữ liệu đã sắp theo thời gian)
-    m_main = fit_model(X.loc[trva, cols], y[trva], params=best_params)
-    p_te = prob_detail(m_main, X.loc[te, cols], ckpt=None if a.prune else ckpt, tag="te")[0]
+    fit_mask = tr if a.pool == "train" else trva
+    if a.pool == "train":
+        # Mô hình cuối = chính mô hình đã chọn tham số trên validation (ngữ cảnh chỉ từ tập train): ngưỡng, kiểm tra và dự đoán test
+        # đều dùng cùng một mô hình; validation không lọt vào ngữ cảnh.
+        m_main = m_tr
+    else:
+        m_main = fit_model(X.loc[trva, cols], y[trva], params=best_params)   # cách cũ: dựng lại từ train+validation
+    p_te, sd_te = prob_detail(m_main, X.loc[te, cols], ckpt=None if (a.prune or not use_tabpfn) else ckpt, tag="te")
     res = metrics(y[te], p_te)
     grp = df.loc[te, "lecturer_id"].values if "lecturer_id" in df.columns else None
     ci = boot_auc(y[te], p_te, groups=grp)        # theo cụm giảng viên (đúng hơn)
@@ -637,7 +748,8 @@ def _train(a):
 
     # ngưỡng trên validation (mô hình chỉ thấy train)
     thr, ok = pick_thresholds(y[va], p_va, max_late_low=a.max_late_low, min_prec_high=a.min_prec_high,
-                              safety_margin=a.safety_margin, min_band=a.min_band, cao_top_pct=a.cao_top_pct)
+                              safety_margin=a.safety_margin, min_band=a.min_band, cao_top_pct=a.cao_top_pct,
+                              safety_margin_high=a.safety_margin_high)
     levels = levels_from(thr)
 
     print(f"\nMÔ HÌNH CHÍNH: TabPFN {TABPFN_VERSION} | params = {best_params} | log-loss validation = {val_ll:.4f}")
@@ -668,12 +780,22 @@ def _train(a):
 
     seg = {}
     Xt = X.loc[te]
-    for sname, mask in [
+    seg_defs = [
         ("giảng viên mới (lịch sử < 5 việc)", (Xt.get("hist_count", pd.Series(99, index=Xt.index)) < 5).values),
         ("giảng viên có lịch sử >= 5 việc", (Xt.get("hist_count", pd.Series(0, index=Xt.index)) >= 5).values),
         ("mùa cao điểm", (Xt.get("peak_season", pd.Series(0, index=Xt.index)) == 1).values),
         ("độ phức tạp cao", (Xt.get("complexity", pd.Series("", index=Xt.index)) == "Cao").values),
-    ]:
+    ]
+    if "checkpoint_fraction" in Xt.columns:
+        seg_defs += [
+            ("mốc kiểm tra 25% thời gian (checkpoint 0.25)", (Xt["checkpoint_fraction"] == 0.25).values),
+            ("mốc kiểm tra 50% thời gian (checkpoint 0.50)", (Xt["checkpoint_fraction"] == 0.50).values),
+        ]
+    if "progress_gap" in Xt.columns:
+        seg_defs.append(("chậm tiến độ > 10% (progress_gap < -10)", (Xt["progress_gap"].fillna(0) < -10).values))
+    if "progress_missing" in Xt.columns:
+        seg_defs.append(("chưa cập nhật tiến độ (progress_missing = 1)", (Xt["progress_missing"] == 1).values))
+    for sname, mask in seg_defs:
         yy, pp = y[te][mask], p_te[mask]
         seg[sname] = dict(
             n=int(mask.sum()),
@@ -686,13 +808,27 @@ def _train(a):
     print("\n=== HIỆU QUẢ THEO NHÓM ===\n" + pd.DataFrame(seg).T.to_string())
 
     os.makedirs(a.out, exist_ok=True)
-    meta = make_meta(df, trva, cols, dict(n_bags=N_BAGS, max_context=context_limit(), context_mode=CONTEXT_MODE,
-                                          tabpfn_version=TABPFN_VERSION, no_tune=bool(a.no_tune)))
+    # --- lưu dự đoán validation/test để báo cáo cuối và so sánh mô hình mà không phải chạy lại GPU ---
+    ids = [c for c in ["task_id", "lecturer_id", "faculty", "assigned_date"] if c in df.columns]
+    extra = [c for c in ["checkpoint_fraction"] if c in df.columns]
+    pd.DataFrame(dict(df.loc[va, ids + extra].reset_index(drop=True).to_dict("list"), y=y[va], risk_probability=np.round(p_va, 5))).to_csv(
+        f"{a.out}/predictions_val.csv", index=False, encoding="utf-8-sig")
+    pt = pd.DataFrame(dict(df.loc[te, ids + extra].reset_index(drop=True).to_dict("list"), y=y[te], risk_probability=np.round(p_te, 5)))
+    if len(m_main["contexts"]) > 1 and use_tabpfn:
+        pt["risk_uncertainty"] = np.round(sd_te, 5)
+    pt.to_csv(f"{a.out}/predictions_test.csv", index=False, encoding="utf-8-sig")
+
+    meta = make_meta(df, fit_mask, cols, dict(pool=a.pool, n_bags=N_BAGS, max_context=context_limit(), context_mode=CONTEXT_MODE,
+                                              tabpfn_version=(TABPFN_VERSION if use_tabpfn else None), no_tune=bool(a.no_tune),
+                                              backend=("tabpfn" if use_tabpfn else "hist_gradient_boosting")))
+    meta["test_after"] = str(t2.date())
+    meta["train_end"] = str(t1.date())
     json.dump(
         dict(
-            main_model="tabpfn",
-            tabpfn_version=TABPFN_VERSION,
+            main_model=("tabpfn" if use_tabpfn else "hist_gradient_boosting"),
+            tabpfn_version=(TABPFN_VERSION if use_tabpfn else None),
             device=resolve_device(),
+            pool=a.pool,
             context=dict(max_context=context_limit(), n_bags=N_BAGS, mode=CONTEXT_MODE,
                          n_rows_in_context=int(len(m_main["contexts"][0][1]))),
             hyperparams=best_params,
@@ -702,7 +838,7 @@ def _train(a):
             test_auc_ci95_method="bootstrap theo cụm giảng viên",
             test_auc_ci95_by_row=[round(c, 4) for c in ci_rows],
             threshold_config=dict(max_late_low=a.max_late_low, min_prec_high=a.min_prec_high, safety_margin=a.safety_margin,
-                                  min_band=a.min_band, cao_top_pct=a.cao_top_pct),
+                                  safety_margin_high=a.safety_margin_high, min_band=a.min_band, cao_top_pct=a.cao_top_pct),
             thresholds=thr,
             thresholds_from_target_precision=ok,
             pruned_groups=pruned,
@@ -714,15 +850,15 @@ def _train(a):
                                min_prec_high=a.min_prec_high, actual_high=_nn(lv.loc["Cao", "ti_le_tre_thuc_te"]),
                                ok_high=bool(lv.loc["Cao", "ti_le_tre_thuc_te"] >= a.min_prec_high)) if ok else None),
             calibration_deciles=dec_json,
-            n_train=int(trva.sum()),
+            n_train=int(fit_mask.sum()),
             n_test=int(te.sum()),
             meta=meta,
         ),
-        open(f"{a.out}/metrics.json", "w"),
+        open(f"{a.out}/metrics.json", "w", encoding="utf-8"),
         ensure_ascii=False,
         indent=2,
     )
-    base = baseline_values(X.loc[trva, cols])
+    base = baseline_values(X.loc[fit_mask, cols])
     out = slim(m_main)
     out.update(levels=levels, thresholds=thr, baseline=base, meta=meta)
     joblib.dump(out, f"{a.out}/risk_model.joblib", compress=3)
@@ -751,17 +887,40 @@ STALE_DAYS = 180          # cảnh báo nếu dữ liệu cần dự đoán các
 
 
 def predict(a):
-    m = joblib.load(a.model)
+    import time
+    t0 = time.time()
+    df = pd.read_csv(a.input)
+    eng = engineer(df)
+    model_path = a.model
+    # Tự động chuyển sang model_dynamic/risk_model.joblib nếu dữ liệu đầu vào có cột tiến độ (%) và người dùng đang trỏ tới model tĩnh mặc định
+    if ("progress_pct" in eng.columns or "checkpoint_fraction" in eng.columns):
+        m_try = joblib.load(model_path)
+        if "progress_pct" not in m_try.get("features", []):
+            dyn_cand = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(model_path))), "model_dynamic", "risk_model.joblib")
+            if os.path.exists(dyn_cand):
+                print(f"[TỰ ĐỘNG] Phát hiện dữ liệu có tiến độ hoàn thành (%) -> chuyển sang Mô hình Động: {dyn_cand}")
+                model_path = dyn_cand
+                m = joblib.load(model_path)
+            else:
+                m = m_try
+        else:
+            m = m_try
+    else:
+        m = joblib.load(model_path)
     # dùng đúng phiên bản/thiết bị lúc huấn luyện, trừ khi người dùng ghi đè
     global TABPFN_VERSION
     if not a.tabpfn_version:
         TABPFN_VERSION = m.get("tabpfn_version", TABPFN_VERSION)
+    eng = restore_dups(eng, m["features"])
     meta = m.get("meta")
+    is_dyn = "progress_pct" in m.get("features", [])
+    model_tag = "MÔ HÌNH ĐỘNG (cập nhật theo % tiến độ)" if is_dyn else "MÔ HÌNH TĨNH (lúc mới giao việc)"
+    if TabPFNClassifier is None:
+        raise SystemExit("[DỪNG] Chưa cài tabpfn: mô hình này chạy bằng TabPFN (pip install tabpfn; GPU được khuyến nghị).")
+    mode_str = f"{model_tag} | TabPFN {m.get('tabpfn_version', '?')} ({len(m['contexts'])} túi)"
     if meta:
-        print(f"Mô hình: TabPFN {m.get('tabpfn_version', '?')} | huấn luyện {meta['trained_at'][:10]} trên dữ liệu "
-              f"{meta['data_start']} -> {meta['data_end']} ({meta['n_rows']:,} dòng) | {len(m['contexts'])} túi ngữ cảnh")
-    df = pd.read_csv(a.input)
-    eng = engineer(df)
+        print(f"Mô hình: {mode_str} | huấn luyện {meta['trained_at'][:10]} trên dữ liệu "
+              f"{meta['data_start']} -> {meta['data_end']} ({meta['n_rows']:,} dòng)")
     lost = [c for c in m["features"] if c not in eng.columns]
     if lost:
         print(
@@ -784,8 +943,10 @@ def predict(a):
         except Exception:
             pass
 
+    t_pred = time.time()
     p, sd = prob_detail(m, X)
-    out = df[[c for c in ID_COLS if c in df.columns]].copy()
+    dyn_cols = [c for c in ["checkpoint_fraction", "days_elapsed", "days_remaining", "progress_pct", "expected_progress_pct", "progress_gap", "progress_missing"] if c in eng.columns]
+    out = eng[[c for c in ID_COLS + dyn_cols if c in eng.columns]].copy()
     out["risk_probability"] = p.round(3)
     out["risk_level"] = [level_of(v, m["levels"]) for v in p]
     if len(m["contexts"]) > 1:
@@ -802,23 +963,38 @@ def predict(a):
         bad = (~v.isin(m["encoder"]["maps"][c].keys())) & X[c].notna().values
         for i in np.where(bad.values)[0]:
             notes[i].append(f"'{c}' có giá trị chưa từng thấy")
+    if "progress_missing" in X.columns:
+        pmiss = (X["progress_missing"].fillna(0) == 1).values
+        for i in np.where(pmiss)[0]:
+            notes[i].append("Chưa cập nhật tiến độ: nguy cơ trễ hạn ẩn")
+    if "progress_gap" in X.columns:
+        pgap = X["progress_gap"].fillna(0).values
+        for i in np.where(pgap < -10.0)[0]:
+            notes[i].append(f"Chậm tiến độ {abs(pgap[i]):.0f}% so với kỳ vọng")
     out["ghi_chu"] = ["; ".join(x) for x in notes]
     if a.explain:
         out["top_factors"] = explain(m, X)
+    infer_ms = (time.time() - t_pred) * 1000
     out.to_csv(a.output, index=False, encoding="utf-8-sig")
     print(out.drop(columns=["top_factors"], errors="ignore").head(10).to_string(index=False))
-    print(f"\nĐã ghi {a.output}")
+    print(f"\nĐã ghi {a.output} ({len(out)} dòng | thời gian suy luận{' + giải thích' if a.explain else ''}: {infer_ms:.1f} ms)")
 
 
 def configure(a):
     """Nhận cấu hình TabPFN từ dòng lệnh."""
-    global TABPFN_VERSION, DEVICE, MAX_CONTEXT, N_BAGS, CONTEXT_MODE
+    global TABPFN_VERSION, DEVICE, MAX_CONTEXT, N_BAGS, CONTEXT_MODE, FIT_MODE
     if getattr(a, "tabpfn_version", None):
         TABPFN_VERSION = a.tabpfn_version
     DEVICE = getattr(a, "device", "auto") or "auto"
     MAX_CONTEXT = getattr(a, "max_context", None)
     N_BAGS = getattr(a, "n_bags", 1) or 1
     CONTEXT_MODE = getattr(a, "context_mode", "random") or "random"
+    FIT_MODE = getattr(a, "fit_mode", None) or None
+    if getattr(a, "cpu_light", False):
+        # Chế độ rút gọn ngữ cảnh TabPFN xuống 1 túi x 2048 dòng khi chạy mạng TabPFN trên CPU (chưa đánh giá chất lượng)
+        DEVICE = "cpu"
+        MAX_CONTEXT = CPU_LIGHT_CONTEXT_CAP
+        N_BAGS = 1
 
 
 def add_tabpfn_args(p):
@@ -827,6 +1003,9 @@ def add_tabpfn_args(p):
     p.add_argument("--max-context", type=int, default=None, help="số dòng ngữ cảnh tối đa/túi (mặc định 10000; 50000 nếu v2.5+ trên GPU)")
     p.add_argument("--n-bags", type=int, default=1, help="số túi ngữ cảnh độc lập, lấy trung bình xác suất")
     p.add_argument("--context-mode", default="random", choices=["random", "recent"])
+    p.add_argument("--fit-mode", default=None, choices=["low_memory", "fit_preprocessors", "fit_with_cache"], help="chế độ lưu đệm của TabPFN; fit_with_cache nhanh hơn nhưng tốn bộ nhớ GPU (thử ở MODE quick trước)")
+    p.add_argument("--cpu-light", action="store_true",
+                   help="chạy TabPFN trên CPU với ngữ cảnh rút gọn (1 túi x 2.048 dòng gần nhất); chất lượng chưa được đánh giá")
 
 
 if __name__ == "__main__":
@@ -836,6 +1015,7 @@ if __name__ == "__main__":
     t.add_argument("--data", required=True)
     t.add_argument("--out", default="./model")
     t.add_argument("--prune", action="store_true", help="loại các nhóm đặc trưng không giúp ích trên validation (chậm)")
+    t.add_argument("--pool", default="train", choices=["train", "trainval"], help="nguồn ngữ cảnh của mô hình cuối: train (mặc định, nhất quán với ngưỡng chọn trên validation) hoặc trainval")
     t.add_argument("--resume", action="store_true", help="tiếp tục từ điểm lưu trong <out>/checkpoint nếu cấu hình và dữ liệu không đổi")
     t.add_argument("--keep-checkpoint", action="store_true", help="giữ lại thư mục điểm lưu sau khi huấn luyện xong")
     t.add_argument("--no-tune", action="store_true", help="bỏ chọn siêu tham số, dùng cấu hình đầu tiên (nhanh)")
@@ -843,6 +1023,7 @@ if __name__ == "__main__":
     t.add_argument("--max-late-low", type=float, default=0.10, help="mục tiêu: nhóm 'Thấp' có tỉ lệ trễ tối đa")
     t.add_argument("--min-prec-high", type=float, default=0.60, help="mục tiêu: nhóm 'Cao' có độ chính xác tối thiểu")
     t.add_argument("--safety-margin", type=float, default=0.01, help="biên an toàn khi chọn ngưỡng (đề phòng lệch giữa validation và giai đoạn sau)")
+    t.add_argument("--safety-margin-high", type=float, default=None, help="biên an toàn RIÊNG cho mức Cao (mặc định = --safety-margin)")
     t.add_argument("--min-band", type=float, default=0.05, help="độ rộng tối thiểu của dải 'Trung bình'")
     t.add_argument("--cao-top-pct", type=float, default=None, help="(tuỳ chọn) đặt ngưỡng 'Cao' để đúng top x%% việc rơi vào nhóm Cao theo năng lực xử lý")
     add_tabpfn_args(t)

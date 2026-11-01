@@ -25,6 +25,8 @@ class Config:
     # --- mức cảnh báo (cùng mục tiêu với train_model.pick_thresholds) ---
     max_late_low: float = 0.10
     min_prec_high: float = 0.60
+    safety_margin: float = 0.01        # biên an toàn mức Thấp (thử lùi 15/15 lần đạt)
+    safety_margin_high: float = 0.03   # biên an toàn mức Cao (thử lùi: 0,01 chỉ đạt 40% số lần, 0,03 đạt 80%)
     level_slack_low: float = 0.02
     level_slack_high: float = 0.05
     # --- chính sách khi có can thiệp: exclude = loại việc đã được can thiệp khỏi dữ liệu huấn luyện ---

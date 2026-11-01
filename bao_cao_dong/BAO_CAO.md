@@ -25,23 +25,17 @@ Tập test: **32,228** dòng, tỉ lệ trễ **24.26%**. Khoảng tin cậy 95%
 
 (ΔAUC > 0: TabPFN tốt hơn; ΔBrier, Δlog-loss < 0: TabPFN tốt hơn. Khoảng tin cậy chứa 0: chưa đủ bằng chứng về khác biệt.)
 
-## 3. Mức cảnh báo của TabPFN (ngưỡng chọn trên validation)
+## 3. Mức cảnh báo của TabPFN (ngưỡng chọn trên validation, không chỉnh sau khi xem test)
 
 Ngưỡng: [0.26, 0.42] | mục tiêu: {'max_late_low': 0.1, 'actual_low': 0.1026, 'ok_low': False, 'min_prec_high': 0.6, 'actual_high': 0.6749, 'ok_high': True}
 
 | Mức | Số việc | % số việc | Tỉ lệ trễ thực tế |
 |---|---|---|---|
-| Thấp | 22,161 | 68.8% | 10.3% |
-| Trung bình | 3,672 | 11.4% | 33.5% |
-| Cao | 6,395 | 19.8% | 67.5% |
+| Thấp | 22,161 | 68.8% | 10.26% |
+| Trung bình | 3,672 | 11.4% | 33.52% |
+| Cao | 6,395 | 19.8% | 67.49% |
 
-## 4. Mô hình nhẹ `--fast-cpu` (HistGradientBoosting, KHÔNG phải TabPFN)
-
-AUC 0.8297 | PR-AUC 0.6673 | Brier 0.1276 | ECE 0.0251 | Spearman với TabPFN 0.944
-
-Với ngưỡng của TabPFN: Thấp: 23,203 việc, trễ 11.2%; Trung bình: 3,503 việc, trễ 38.2%; Cao: 5,522 việc, trễ 70.2%
-
-## 5. Hiệu chuẩn theo quý (tỉ lệ trễ thực tế và dự đoán trung bình)
+## 4. Hiệu chuẩn theo quý (tỉ lệ trễ thực tế và dự đoán trung bình)
 
 | quy    |    n |   ti_le_tre_that |   tabpfn_dd_TB |   hist_baseline_dd_TB |   logistic_base_dd_TB |   logistic_spline_dd_TB |   catboost_dd_TB |   catboost_khong_tien_do_dd_TB |
 |:-------|-----:|-----------------:|---------------:|----------------------:|----------------------:|------------------------:|-----------------:|-------------------------------:|
@@ -51,7 +45,7 @@ Với ngưỡng của TabPFN: Thấp: 23,203 việc, trễ 11.2%; Trung bình: 3
 | 2028Q2 | 9413 |           0.2594 |         0.2538 |                0.1725 |                0.2444 |                  0.2275 |           0.2432 |                         0.2444 |
 | 2028Q3 | 2758 |           0.2197 |         0.2432 |                0.1783 |                0.2176 |                  0.198  |           0.2194 |                         0.223  |
 
-## 6. AUC theo nhóm
+## 5. AUC theo nhóm
 
 |                             |     n |   tabpfn |   hist_baseline |   logistic_base |   logistic_spline |   catboost |   catboost_khong_tien_do |
 |:----------------------------|------:|---------:|----------------:|----------------:|------------------:|-----------:|-------------------------:|

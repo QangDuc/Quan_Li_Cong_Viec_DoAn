@@ -1,0 +1,48 @@
+{
+  "note": "Ngưỡng cho động cơ thay thế surrogate_hgb (KHÔNG phải TabPFN). Chọn trên validation, đo trên test.",
+  "created": "2026-10-30",
+  "thresholds": [
+    0.2,
+    0.53
+  ],
+  "thresholds_ok": true,
+  "safety_margin": 0.01,
+  "safety_margin_high": 0.03,
+  "n_val": 14891,
+  "n_test": 24908,
+  "val": {
+    "roc_auc": 0.7994,
+    "pr_auc": 0.5505,
+    "brier": 0.1196,
+    "ece": 0.018728207179941017,
+    "base_rate": 0.19172654623598145,
+    "recall_at_top20pct": 0.5362521891418564,
+    "precision_at_top20pct": 0.5139308492782813,
+    "thap": {
+      "share": 0.6473,
+      "late_rate": 0.0813
+    },
+    "cao": {
+      "share": 0.0948,
+      "precision": 0.6634
+    }
+  },
+  "test": {
+    "roc_auc": 0.7991,
+    "pr_auc": 0.5797,
+    "brier": 0.1299,
+    "ece": 0.016126178247453497,
+    "base_rate": 0.21719929339971095,
+    "recall_at_top20pct": 0.5190388170055453,
+    "precision_at_top20pct": 0.5636290646326776,
+    "thap": {
+      "share": 0.662,
+      "late_rate": 0.0992
+    },
+    "cao": {
+      "share": 0.089,
+      "precision": 0.7094
+    }
+  },
+  "test_note": "Tập test v2 đã được xem trong các lần đánh giá trước nên số này chỉ để minh họa, không dùng để chọn ngưỡng."
+}

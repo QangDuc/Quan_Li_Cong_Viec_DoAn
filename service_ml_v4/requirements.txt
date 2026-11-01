@@ -1,0 +1,11 @@
+# Dịch vụ suy luận ML (động cơ mặc định: TabPFN). Phiên bản theo model/metrics.json (meta.versions) của lần huấn luyện.
+pandas>=2.0.0
+numpy>=1.24.0
+scikit-learn==1.6.1        # file .joblib chứa mô hình scikit-learn: PHẢI đúng phiên bản huấn luyện
+joblib>=1.3.0
+torch>=2.5                 # tabpfn 9.2.0 yêu cầu torch>=2.5 và Python>=3.10
+tabpfn==9.2.0              # đúng phiên bản huấn luyện; không cần nếu chỉ chạy ML_ENGINE=surrogate_hgb (bản demo, không đánh giá)
+fastapi
+uvicorn
+pydantic
+httpx                      # chỉ cần cho test_ml_service.py (TestClient)

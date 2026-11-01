@@ -165,21 +165,56 @@ def t_monitor_psi_drift():
 
 
 def t_monitor_level2_evaluation():
-    from hoc_tiep.monitor import Level2Monitor, evaluate_monitoring_window
+    from hoc_tiep.monitor import Level2Monitor
     st = FeedbackStore()
-    d = make(500, "2026-01-01", 80, 42)
-    # Ghi nhận dự đoán và nhãn
-    st.log_predictions(d, np.full(500, 0.25), ["Thấp"] * 500, "v1", predicted_at="2026-01-01")
+    d = make(1500, "2026-01-01", 80, 42)
+    st.log_predictions(d, np.full(1500, 0.25), ["Thấp"] * 1500, "v1", predicted_at="2026-01-01")
     o = pd.DataFrame({"task_id": d.task_id, "lecturer_id": d.lecturer_id, "is_late": d.is_late,
                       "completed_date": d.assigned_date + pd.Timedelta(days=5)})
     st.record_outcomes(o, recorded_at="2026-04-01")
+    res = Level2Monitor(st, thr=(0.20, 0.50)).check_period("2026-04-02", window_days=100)
+    assert res["status"] in ["HEALTHY", "WARNING", "ALERT"] and res["n_samples"] == 1500
+    assert "calibration_gap" in res and "calibration_z" in res and "drift_psi" in res
+    small = Level2Monitor(st, thr=(0.20, 0.50)).check_period("2026-01-20", window_days=10)       # ít việc hoàn thành -> không kết luận
+    assert small["status"] in ("INSUFFICIENT_DATA", "NO_DATA")
 
-    mon = Level2Monitor(st, thr=(0.20, 0.50))
-    res = mon.check_period("2026-04-02", window_days=100)
-    assert res["status"] in ["HEALTHY", "WARNING", "ALERT"]
-    assert res["n_samples"] == 500
-    assert "calibration_gap" in res
-    assert "drift_psi" in res
+
+def _p_dist(r, n):
+    """Phân phối xác suất kiểu TabPFN trên v2: ~70% nhóm Thấp (p TB 0,074), ~20% Trung bình, ~10% Cao."""
+    k = r.random(n)
+    return np.where(k < 0.70, np.clip(r.beta(2, 25, n), 0.005, 0.229), np.where(k < 0.90, r.uniform(0.23, 0.52, n), r.uniform(0.52, 0.9, n)))
+
+
+def _window(p, y):
+    return pd.DataFrame({"is_late": y, "risk_logged": p})
+
+
+def t_monitor_false_alarm_rate():
+    """Mô hình hiệu chuẩn hoàn hảo theo định nghĩa (y ~ Bernoulli(p)): cảnh báo do nhiễu thuần túy phải hiếm khi cửa sổ đủ lớn."""
+    from hoc_tiep.monitor import evaluate_monitoring_window
+    r = np.random.default_rng(7)
+    for n, max_alert, max_any in [(1000, 0.01, 0.05), (3000, 0.01, 0.05)]:
+        al = anyw = 0
+        for _ in range(200):
+            p = _p_dist(r, n); y = (r.random(n) < p).astype(int)
+            s = evaluate_monitoring_window(_window(p, y), thr=(0.23, 0.52))["status"]
+            al += s == "ALERT"; anyw += s in ("ALERT", "WARNING")
+        assert al / 200 <= max_alert and anyw / 200 <= max_any, (n, al / 200, anyw / 200)
+    assert evaluate_monitoring_window(_window(_p_dist(r, 200), np.zeros(200, int)), thr=(0.23, 0.52))["status"] == "INSUFFICIENT_DATA"
+
+
+def t_monitor_detects_real_problems():
+    from hoc_tiep.monitor import evaluate_monitoring_window
+    r = np.random.default_rng(8)
+    cal = slo = 0
+    for _ in range(100):
+        p = _p_dist(r, 3000)
+        y1 = (r.random(3000) < np.clip(p + 0.08, 0, 1)).astype(int)                          # mô hình dự đoán thấp hơn thực tế 8 điểm %
+        res = evaluate_monitoring_window(_window(p, y1), thr=(0.23, 0.52)); cal += res["status"] == "ALERT" and res["action"] == "TRIGGER_RETRAIN"
+        p = _p_dist(r, 5000)
+        y2 = (r.random(5000) < np.where(p < 0.23, 0.16, p)).astype(int)                      # nhóm Thấp thực tế trễ 16%
+        res = evaluate_monitoring_window(_window(p, y2), thr=(0.23, 0.52)); slo += res["status"] == "ALERT" and any("SLO" in x for x in res["reasons"])
+    assert cal >= 95 and slo >= 95, (cal, slo)
 
 
 if __name__ == "__main__":

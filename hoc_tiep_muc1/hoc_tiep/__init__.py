@@ -8,3 +8,5 @@ from .model_backend import HGBBackend, prepare_features
 from .compare import paired_bootstrap, level_stats, pick_thresholds
 from . import retrain_job
 from .serving import RiskService
+from .tabpfn_backend import TabPFNBackend, import_service_bundle, get_backend
+from . import auto_job

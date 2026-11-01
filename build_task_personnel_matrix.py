@@ -51,9 +51,11 @@ def build_static_matrix(df, key_task="task_type"):
     return mat.sort_values(["lecturer_id", key_task]).reset_index(drop=True)
 
 
-def enrich_temporal(df, key_task="task_type"):
+def enrich_temporal(df, key_task="task_type", out_dir=None, data_path=None):
     """
-    Gắn đặc trưng ma trận vào từng dòng, chỉ dùng lịch sử TRƯỚC ngày giao (tránh rò rỉ).
+    Gắn đặc trưng ma trận vào từng dòng, chỉ dùng lịch sử của các việc ĐÃ HOÀN THÀNH TRƯỚC ngày giao (tránh rò rỉ).
+    Nếu bảng dữ liệu chưa có completed_date / expected_duration_days, tự động tìm trong task_assignments.csv cùng thư mục,
+    hoặc xấp xỉ ngày hoàn thành tối thiểu = assigned_date + available_days.
     Trả về df kèm các cột:
       lecturer_task_count, lecturer_task_late_rate,
       dept_task_late_rate, task_matrix_source  (personal | department | global)
@@ -65,6 +67,26 @@ def enrich_temporal(df, key_task="task_type"):
     out_dept = np.full(n, PRIOR_RATE)
     out_src = np.array(["global"] * n, dtype=object)
 
+    # Xác định thời điểm hoàn thành (done_date) của từng dòng để chỉ cập nhật lịch sử sau khi việc đã xong
+    done_dates = None
+    if "completed_date" in df.columns:
+        done_dates = pd.to_datetime(df["completed_date"], errors="coerce")
+    elif data_path:
+        ta_path = os.path.join(os.path.dirname(os.path.abspath(data_path)), "task_assignments.csv")
+        if os.path.exists(ta_path) and {"task_id", "lecturer_id"} <= set(df.columns):
+            try:
+                ta = pd.read_csv(ta_path, usecols=["task_id", "lecturer_id", "completed_date"], parse_dates=["completed_date"])
+                ta = ta.drop_duplicates(["task_id", "lecturer_id"])
+                merged_cd = df[["task_id", "lecturer_id"]].merge(ta, on=["task_id", "lecturer_id"], how="left")["completed_date"]
+                if merged_cd.notna().any():
+                    done_dates = merged_cd
+            except Exception:
+                done_dates = None
+    if done_dates is None and "assigned_date" in df.columns:
+        ad = pd.to_datetime(df["assigned_date"], errors="coerce")
+        dur = df["available_days"].fillna(1) if "available_days" in df.columns else 0
+        done_dates = ad + pd.to_timedelta(dur, unit="D")
+
     # state: (lecturer_id, task) -> [count, late_sum]
     #        (department, task) -> [count, late_sum]
     lect_state = {}
@@ -72,12 +94,30 @@ def enrich_temporal(df, key_task="task_type"):
     global_state = {}  # task -> [count, late_sum]
 
     has_dept = "department" in df.columns
-    rows = df.itertuples(index=True)
+    import heapq
+    pending = []  # min-heap theo (done_ord, idx, lk, dk, task, late)
+    ad_ords = pd.to_datetime(df["assigned_date"]).map(lambda x: x.toordinal() if pd.notna(x) else 0).to_numpy() if "assigned_date" in df.columns else np.arange(n)
+    done_ords = done_dates.map(lambda x: x.toordinal() if pd.notna(x) else 0).to_numpy() if done_dates is not None else ad_ords
 
-    # We need sequential update: for each row use state BEFORE adding this row's outcome.
-    # Outcomes become available only after the task is "done" — in training set all rows are labeled,
-    # so we treat past rows (earlier assigned_date) as history. Same lecturer+task earlier rows count.
     for i, r in enumerate(df.itertuples(index=False)):
+        cur_ord = ad_ords[i]
+        # Đưa các việc đã hoàn thành TRƯỚC ngày giao hiện tại (done_ord < cur_ord) vào lịch sử
+        while pending and pending[0][0] < cur_ord:
+            _, _, p_lk, p_dk, p_task, p_late = heapq.heappop(pending)
+            if p_lk not in lect_state:
+                lect_state[p_lk] = [0.0, 0.0]
+            lect_state[p_lk][0] += 1
+            lect_state[p_lk][1] += p_late
+            if p_dk is not None:
+                if p_dk not in dept_state:
+                    dept_state[p_dk] = [0.0, 0.0]
+                dept_state[p_dk][0] += 1
+                dept_state[p_dk][1] += p_late
+            if p_task not in global_state:
+                global_state[p_task] = [0.0, 0.0]
+            global_state[p_task][0] += 1
+            global_state[p_task][1] += p_late
+
         lid = r.lecturer_id
         task = getattr(r, key_task)
         dep = getattr(r, "department", None) if has_dept else None
@@ -112,22 +152,10 @@ def enrich_temporal(df, key_task="task_type"):
         else:
             out_dept[i] = PRIOR_RATE
 
-        # update state with this row's label (becomes history for later rows)
+        # Đưa kết quả của dòng hiện tại vào hàng đợi chờ tới ngày hoàn thành (done_ord)
         late = float(r.is_late) if hasattr(r, "is_late") and r.is_late == r.is_late else 0.0
-        if lk not in lect_state:
-            lect_state[lk] = [0.0, 0.0]
-        lect_state[lk][0] += 1
-        lect_state[lk][1] += late
-        if has_dept and dep is not None:
-            dk = (dep, task)
-            if dk not in dept_state:
-                dept_state[dk] = [0.0, 0.0]
-            dept_state[dk][0] += 1
-            dept_state[dk][1] += late
-        if task not in global_state:
-            global_state[task] = [0.0, 0.0]
-        global_state[task][0] += 1
-        global_state[task][1] += late
+        dk = (dep, task) if (has_dept and dep is not None) else None
+        heapq.heappush(pending, (done_ords[i], i, lk, dk, task, late))
 
     df = df.copy()
     df["lecturer_task_count"] = out_count
@@ -162,15 +190,21 @@ def main():
     os.makedirs(a.out, exist_ok=True)
 
     df = pd.read_csv(a.data, parse_dates=["assigned_date"] if "assigned_date" in pd.read_csv(a.data, nrows=0).columns else None)
-    if "is_late" not in df.columns and not a.inference:
-        raise SystemExit("Cần cột is_late để xây ma trận. Với dữ liệu dự đoán: truyền --data là tập có nhãn + --enrich file cần dự đoán --inference")
+    is_prebuilt_mat = {"lecturer_id", a.key_task, "n_tasks", "late_rate_smooth"} <= set(df.columns)
+    if "is_late" not in df.columns and not is_prebuilt_mat and not a.inference:
+        raise SystemExit("Cần cột is_late (hoặc file ma trận đã tính sẵn task_personnel_matrix.csv) để xây ma trận. Với dữ liệu dự đoán: truyền --data là tập có nhãn hoặc task_personnel_matrix.csv + --enrich file cần dự đoán --inference")
 
-    # 1) Ma trận tĩnh (báo cáo)
+    # 1) Ma trận tĩnh (báo cáo & tra cứu khi inference)
     if "is_late" in df.columns:
-        mat = build_static_matrix(df, key_task=a.key_task)
+        df_mat_src = df
+        if "assigned_date" in df.columns:
+            # Chỉ tổng hợp trên phần Train+Validation (<= phân vị 75%) để tránh rò rỉ nhãn tập Test vào ma trận tĩnh khi inference
+            t2 = df["assigned_date"].quantile(0.75)
+            df_mat_src = df[df["assigned_date"] <= t2].copy()
+        mat = build_static_matrix(df_mat_src, key_task=a.key_task)
         mat_path = os.path.join(a.out, "task_personnel_matrix.csv")
         mat.to_csv(mat_path, index=False, encoding="utf-8-sig")
-        print(f"Ma trận tĩnh: {len(mat)} ô (lecturer × {a.key_task}) → {mat_path}")
+        print(f"Ma trận tĩnh: {len(mat)} ô (lecturer × {a.key_task}, từ {len(df_mat_src)} dòng lịch sử) → {mat_path}")
         print(mat.head(8).to_string(index=False))
 
         wide = pivot_heatmap(mat, key_task=a.key_task)
@@ -181,37 +215,56 @@ def main():
         # thống kê nhanh
         coverage = (mat.n_tasks >= 3).mean()
         print(f"Tỉ lệ ô có ≥ 3 việc: {coverage:.1%} | late_rate_smooth TB: {mat.late_rate_smooth.mean():.3f}")
+    elif is_prebuilt_mat:
+        mat = df
+        print(f"Nạp trực tiếp ma trận tĩnh đã tính sẵn: {len(mat)} ô từ {a.data}")
     else:
-        mat = None
-        print("Bỏ qua ma trận tĩnh (không có nhãn trong --data)")
+        mat_fallback = os.path.join(a.out, "task_personnel_matrix.csv")
+        if os.path.exists(mat_fallback):
+            mat = pd.read_csv(mat_fallback)
+            print(f"Nạp ma trận tĩnh từ {mat_fallback}: {len(mat)} ô")
+        else:
+            mat = None
+            print("Bỏ qua ma trận tĩnh (không có nhãn trong --data)")
 
     # 2) Enrich đặc trưng theo thời gian
     enrich_path = a.enrich or a.data
+    if is_prebuilt_mat and not a.enrich:
+        print("Đã nạp ma trận tĩnh (không có --enrich cần gắn đặc trưng). Xong.")
+        return
     edf = pd.read_csv(enrich_path, parse_dates=["assigned_date"] if "assigned_date" in pd.read_csv(enrich_path, nrows=0).columns else None)
 
     if a.inference or "is_late" not in edf.columns:
         # merge ma trận tĩnh (đã tính từ tập có nhãn)
         if mat is None:
-            raise SystemExit("Cần --data có nhãn để suy ra ma trận khi --inference")
+            raise SystemExit("Cần --data có nhãn hoặc file task_personnel_matrix.csv để suy ra ma trận khi --inference")
+        # tránh trùng tên cột nếu file enrich đã có sẵn các cột ma trận
+        drop_existing = [c for c in ["lecturer_task_count", "lecturer_task_late_rate", "dept_task_late_rate",
+                                     "task_matrix_source", "lecturer_task_late_lift"] if c in edf.columns]
+        if drop_existing:
+            edf = edf.drop(columns=drop_existing)
         key = ["lecturer_id", a.key_task]
-        use = mat[key + ["n_tasks", "late_rate_smooth"]].rename(
+        use = mat[key + ["n_tasks", "late_rate_smooth"]].drop_duplicates(key).rename(
             columns={"n_tasks": "lecturer_task_count", "late_rate_smooth": "lecturer_task_late_rate"}
         )
         edf = edf.merge(use, on=key, how="left")
         if "department" in edf.columns and "dept_late_rate_smooth" in mat.columns:
-            dep = mat[["department", a.key_task, "dept_late_rate_smooth"]].drop_duplicates()
+            dep = mat[["department", a.key_task, "dept_late_rate_smooth"]].drop_duplicates(["department", a.key_task])
             dep = dep.rename(columns={"dept_late_rate_smooth": "dept_task_late_rate"})
             edf = edf.merge(dep, on=["department", a.key_task], how="left")
         else:
             edf["dept_task_late_rate"] = PRIOR_RATE
+        has_personal = edf["lecturer_task_count"].fillna(0) > 0
+        has_dept_prior = edf["dept_task_late_rate"].notna()
         edf["lecturer_task_count"] = edf["lecturer_task_count"].fillna(0)
-        edf["lecturer_task_late_rate"] = edf["lecturer_task_late_rate"].fillna(PRIOR_RATE)
         edf["dept_task_late_rate"] = edf["dept_task_late_rate"].fillna(PRIOR_RATE)
-        edf["task_matrix_source"] = np.where(edf["lecturer_task_count"] > 0, "personal", "department")
+        # Khi giảng viên chưa từng làm loại việc này (count == 0), lùi về tỉ lệ trễ của Bộ môn (nếu có), sau đó mới tới PRIOR_RATE
+        edf["lecturer_task_late_rate"] = np.where(has_personal, edf["lecturer_task_late_rate"], edf["dept_task_late_rate"])
+        edf["task_matrix_source"] = np.where(has_personal, "personal", np.where(has_dept_prior, "department", "global"))
         edf["lecturer_task_late_lift"] = edf["lecturer_task_late_rate"] - edf["dept_task_late_rate"]
         print(f"[inference] merge ma trận tĩnh vào {len(edf)} dòng")
     else:
-        edf = enrich_temporal(edf, key_task=a.key_task)
+        edf = enrich_temporal(edf, key_task=a.key_task, out_dir=a.out, data_path=a.data)
         src_dist = edf.task_matrix_source.value_counts(normalize=True).round(3).to_dict()
         print(f"Đặc trưng thời gian: nguồn prior = {src_dist}")
         print(f"  lecturer_task_count=0 (chưa làm loại việc): {(edf.lecturer_task_count == 0).mean():.1%}")
@@ -235,7 +288,7 @@ def main():
         output_matrix=os.path.join(a.out, "task_personnel_matrix.csv"),
         output_enriched=out_enrich,
     )
-    json.dump(meta, open(os.path.join(a.out, "task_personnel_matrix_meta.json"), "w"),
+    json.dump(meta, open(os.path.join(a.out, "task_personnel_matrix_meta.json"), "w", encoding="utf-8"),
               ensure_ascii=False, indent=2)
     print("Xong.")
 

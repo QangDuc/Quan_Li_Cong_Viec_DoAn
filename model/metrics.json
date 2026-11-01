@@ -3,33 +3,6 @@
   "tabpfn_version": "v2",
   "device": "cuda",
   "pool": "train",
-  "fast_cpu": {
-    "note": "Mô hình nhẹ HistGradientBoosting 4 túi dùng cho --fast-cpu (demo web). KHÔNG phải TabPFN; huấn luyện trên train+validation.",
-    "test": {
-      "roc_auc": 0.8047,
-      "pr_auc": 0.5917,
-      "brier": 0.1282,
-      "ece": 0.0192,
-      "base_rate": 0.2172,
-      "recall_at_top20pct": 0.529,
-      "precision_at_top20pct": 0.5745
-    },
-    "alert_levels_with_main_thresholds": {
-      "Thấp": {
-        "n": 17809,
-        "late_rate": 0.1074
-      },
-      "Trung bình": {
-        "n": 4928,
-        "late_rate": 0.3866
-      },
-      "Cao": {
-        "n": 2171,
-        "late_rate": 0.7338
-      }
-    },
-    "spearman_vs_main": 0.9535
-  },
   "context": {
     "max_context": 10000,
     "n_bags": 4,

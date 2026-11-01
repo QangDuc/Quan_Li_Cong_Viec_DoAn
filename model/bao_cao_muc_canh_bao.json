@@ -1,126 +1,127 @@
 {
- "model": "/content/drive/MyDrive/du_doan_tre_han_tabpfn/model/risk_model.joblib",
+ "model": "model/risk_model.joblib",
  "n_bags": 4,
  "thresholds": [
-  0.22,
-  0.44
+  0.23,
+  0.52
  ],
  "test": {
-  "roc_auc": 0.8198,
-  "pr_auc": 0.605,
-  "brier": 0.1154,
-  "ece": 0.0214,
-  "base_rate": 0.1984,
-  "recall_at_top20pct": 0.5716,
-  "precision_at_top20pct": 0.5671
+  "roc_auc": 0.809,
+  "pr_auc": 0.5972,
+  "brier": 0.1266,
+  "ece": 0.0075,
+  "base_rate": 0.2172,
+  "recall_at_top20pct": 0.5333,
+  "precision_at_top20pct": 0.5791
  },
  "test_auc_ci95_by_lecturer": [
-  0.8065,
-  0.8303
+  0.7962,
+  0.8205
  ],
  "alert_levels": {
   "Thấp": {
-   "n": 18720,
-   "late_rate": 0.0952,
-   "share": 0.749
+   "n": 17172,
+   "late_rate": 0.1004,
+   "share": 0.6894
   },
   "Trung bình": {
-   "n": 3449,
-   "late_rate": 0.3514,
-   "share": 0.138
+   "n": 4927,
+   "late_rate": 0.353,
+   "share": 0.1978
   },
   "Cao": {
-   "n": 2825,
-   "late_rate": 0.6959,
-   "share": 0.113
+   "n": 2809,
+   "late_rate": 0.6931,
+   "share": 0.1128
   }
  },
  "target_check": {
   "max_late_low": 0.1,
-  "actual_low": 0.0952,
-  "ok_low": true,
+  "actual_low": 0.1004,
+  "ok_low": false,
   "min_prec_high": 0.6,
-  "actual_high": 0.6959,
+  "actual_high": 0.6931,
   "ok_high": true
  },
- "mean_pred": 0.177,
- "late_rate": 0.1984,
+ "mean_pred": 0.212,
+ "late_rate": 0.2172,
  "segments": {
   "giảng viên mới (lịch sử < 5 việc)": {
-   "n": 225,
-   "late_rate": 0.067,
-   "mean_pred": 0.056,
-   "auc": 0.67
+   "n": 189,
+   "late_rate": 0.063,
+   "mean_pred": 0.067,
+   "auc": null
   },
   "giảng viên có lịch sử >= 5 việc": {
-   "n": 24769,
-   "late_rate": 0.2,
-   "mean_pred": 0.178,
-   "auc": 0.82
+   "n": 24719,
+   "late_rate": 0.218,
+   "mean_pred": 0.214,
+   "auc": 0.809
   },
   "mùa cao điểm": {
-   "n": 13148,
-   "late_rate": 0.229,
-   "mean_pred": 0.2,
-   "auc": 0.827
+   "n": 12874,
+   "late_rate": 0.243,
+   "mean_pred": 0.235,
+   "auc": 0.817
   },
   "độ phức tạp cao": {
-   "n": 7103,
-   "late_rate": 0.279,
-   "mean_pred": 0.264,
-   "auc": 0.81
+   "n": 6314,
+   "late_rate": 0.319,
+   "mean_pred": 0.324,
+   "auc": 0.799
   }
  },
  "calibration_deciles": [
   {
-   "mean_pred": 0.0245,
-   "late_rate": 0.0372,
-   "n": 2500
+   "mean_pred": 0.0277,
+   "late_rate": 0.0369,
+   "n": 2491
   },
   {
-   "mean_pred": 0.0355,
-   "late_rate": 0.0432,
-   "n": 2499
+   "mean_pred": 0.0428,
+   "late_rate": 0.0562,
+   "n": 2491
   },
   {
-   "mean_pred": 0.0472,
-   "late_rate": 0.06,
-   "n": 2499
+   "mean_pred": 0.0588,
+   "late_rate": 0.0642,
+   "n": 2491
   },
   {
-   "mean_pred": 0.0617,
-   "late_rate": 0.0684,
-   "n": 2500
+   "mean_pred": 0.0791,
+   "late_rate": 0.0815,
+   "n": 2490
   },
   {
-   "mean_pred": 0.0818,
-   "late_rate": 0.0924,
-   "n": 2499
+   "mean_pred": 0.1061,
+   "late_rate": 0.1192,
+   "n": 2491
   },
   {
-   "mean_pred": 0.1103,
-   "late_rate": 0.1349,
-   "n": 2499
+   "mean_pred": 0.1444,
+   "late_rate": 0.1558,
+   "n": 2491
   },
   {
-   "mean_pred": 0.1525,
-   "late_rate": 0.1672,
-   "n": 2500
+   "mean_pred": 0.2016,
+   "late_rate": 0.2048,
+   "n": 2490
   },
   {
-   "mean_pred": 0.2228,
-   "late_rate": 0.2469,
-   "n": 2499
+   "mean_pred": 0.2932,
+   "late_rate": 0.2951,
+   "n": 2491
   },
   {
-   "mean_pred": 0.3635,
-   "late_rate": 0.4154,
-   "n": 2499
+   "mean_pred": 0.4481,
+   "late_rate": 0.4492,
+   "n": 2491
   },
   {
-   "mean_pred": 0.6703,
-   "late_rate": 0.7188,
-   "n": 2500
+   "mean_pred": 0.7227,
+   "late_rate": 0.709,
+   "n": 2491
   }
- ]
+ ],
+ "_ghi_chu": "Tạo lại từ model/metrics.json (bộ dữ liệu v2, n_test=24908); thay file cũ của bộ dữ liệu trước."
 }
