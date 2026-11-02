@@ -33,6 +33,7 @@ def _build_lecturer_and_context(db: Session, lecturer_id: int, task_type_id: int
     # 1. Lịch sử hoàn thành của giảng viên
     completed_assignments = (
         db.query(TaskAssignment)
+        .join(Task)
         .filter(
             TaskAssignment.lecturer_id == lecturer_id,
             TaskAssignment.status == ST_DONE,
@@ -46,9 +47,8 @@ def _build_lecturer_and_context(db: Session, lecturer_id: int, task_type_id: int
             "completed_at": a.completed_at,
             "is_late": bool(a.is_late),
             "delay_days": a.delay_days,
-            # hist_late_last5 lúc huấn luyện lấy 5 việc xong gần nhất THEO THỨ TỰ GIAO; cần ngày giao của từng phân công.
-            # [Cần xác nhận tên cột trong models.TaskAssignment: gói ML không có models.py. Thiếu thì ml_features dùng thứ tự danh sách.]
-            "assigned_at": getattr(a, "assigned_at", None) or getattr(a, "created_at", None),
+            # hist_late_last5 lúc huấn luyện lấy 5 việc xong gần nhất THEO THỨ TỰ GIAO; lấy từ Task.assigned_at (đã đối chiếu với app/models.py).
+            "assigned_at": getattr(a, "assigned_at", None) or (a.task.assigned_at if getattr(a, "task", None) else None) or getattr(a, "created_at", None),
             "task_id": getattr(a, "task_id", None),
         }
         for a in completed_assignments

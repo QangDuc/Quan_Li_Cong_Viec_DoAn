@@ -1,0 +1,233 @@
+{
+ "title": "Mô hình tĩnh",
+ "dynamic": false,
+ "n_test": 24908,
+ "late_rate": 0.2172,
+ "metrics": {
+  "tabpfn": {
+   "roc_auc": 0.80901,
+   "pr_auc": 0.59716,
+   "brier": 0.12663,
+   "logloss": 0.40535,
+   "ece": 0.0075,
+   "recall_at_top20pct": 0.53327,
+   "precision_at_top20pct": 0.57908
+  },
+  "hist_baseline": {
+   "roc_auc": 0.68862,
+   "pr_auc": 0.37225,
+   "brier": 0.15907,
+   "logloss": 0.49297,
+   "ece": 0.04531,
+   "recall_at_top20pct": 0.37061,
+   "precision_at_top20pct": 0.40245
+  },
+  "logistic_base": {
+   "roc_auc": 0.80718,
+   "pr_auc": 0.5936,
+   "brier": 0.12736,
+   "logloss": 0.40733,
+   "ece": 0.01127,
+   "recall_at_top20pct": 0.5305,
+   "precision_at_top20pct": 0.57607
+  },
+  "logistic_spline": {
+   "roc_auc": 0.80828,
+   "pr_auc": 0.59628,
+   "brier": 0.12785,
+   "logloss": 0.40921,
+   "ece": 0.02847,
+   "recall_at_top20pct": 0.53179,
+   "precision_at_top20pct": 0.57748
+  },
+  "catboost": {
+   "roc_auc": 0.80947,
+   "pr_auc": 0.59697,
+   "brier": 0.12682,
+   "logloss": 0.40565,
+   "ece": 0.01437,
+   "recall_at_top20pct": 0.53494,
+   "precision_at_top20pct": 0.58089
+  }
+ },
+ "auc_ci95": {
+  "tabpfn": [
+   0.7966,
+   0.8204
+  ],
+  "hist_baseline": [
+   0.6657,
+   0.7093
+  ],
+  "logistic_base": [
+   0.795,
+   0.8188
+  ],
+  "logistic_spline": [
+   0.796,
+   0.8196
+  ],
+  "catboost": [
+   0.7973,
+   0.8206
+  ]
+ },
+ "brier_ci95": {
+  "tabpfn": [
+   0.1205,
+   0.13209
+  ],
+  "hist_baseline": [
+   0.14882,
+   0.16851
+  ],
+  "logistic_base": [
+   0.12084,
+   0.13309
+  ],
+  "logistic_spline": [
+   0.12115,
+   0.13349
+  ],
+  "catboost": [
+   0.12049,
+   0.13233
+  ]
+ },
+ "paired_tabpfn_minus": {
+  "hist_baseline": {
+   "d_auc": 0.1202,
+   "d_auc_ci": [
+    0.1064,
+    0.1358
+   ],
+   "d_brier": -0.03228,
+   "d_brier_ci": [
+    -0.03703,
+    -0.02756
+   ],
+   "d_logloss": -0.08719
+  },
+  "logistic_base": {
+   "d_auc": 0.0018,
+   "d_auc_ci": [
+    -0.0001,
+    0.0037
+   ],
+   "d_brier": -0.00071,
+   "d_brier_ci": [
+    -0.00132,
+    -7e-05
+   ],
+   "d_logloss": -0.00192
+  },
+  "logistic_spline": {
+   "d_auc": 0.0007,
+   "d_auc_ci": [
+    -0.0016,
+    0.0029
+   ],
+   "d_brier": -0.00119,
+   "d_brier_ci": [
+    -0.00215,
+    -0.00022
+   ],
+   "d_logloss": -0.0038
+  },
+  "catboost": {
+   "d_auc": -0.0004,
+   "d_auc_ci": [
+    -0.0022,
+    0.0014
+   ],
+   "d_brier": -0.00019,
+   "d_brier_ci": [
+    -0.00089,
+    0.00054
+   ],
+   "d_logloss": -0.00031
+  }
+ },
+ "segments_auc": {
+  "giảng viên mới (<5 việc)": {
+   "n": 189.0,
+   "tabpfn": NaN,
+   "hist_baseline": NaN,
+   "logistic_base": NaN,
+   "logistic_spline": NaN,
+   "catboost": NaN
+  },
+  "giảng viên có lịch sử (>=5)": {
+   "n": 24719.0,
+   "tabpfn": 0.809,
+   "hist_baseline": 0.689,
+   "logistic_base": 0.807,
+   "logistic_spline": 0.808,
+   "catboost": 0.809
+  },
+  "mùa cao điểm": {
+   "n": 12874.0,
+   "tabpfn": 0.817,
+   "hist_baseline": 0.694,
+   "logistic_base": 0.816,
+   "logistic_spline": 0.816,
+   "catboost": 0.817
+  },
+  "độ phức tạp cao": {
+   "n": 6314.0,
+   "tabpfn": 0.799,
+   "hist_baseline": 0.694,
+   "logistic_base": 0.796,
+   "logistic_spline": 0.797,
+   "catboost": 0.802
+  },
+  "Khoa K01": {
+   "n": 4294.0,
+   "tabpfn": 0.821,
+   "hist_baseline": 0.708,
+   "logistic_base": 0.818,
+   "logistic_spline": 0.823,
+   "catboost": 0.822
+  },
+  "Khoa K02": {
+   "n": 4158.0,
+   "tabpfn": 0.804,
+   "hist_baseline": 0.678,
+   "logistic_base": 0.805,
+   "logistic_spline": 0.803,
+   "catboost": 0.805
+  },
+  "Khoa K03": {
+   "n": 4088.0,
+   "tabpfn": 0.8,
+   "hist_baseline": 0.693,
+   "logistic_base": 0.8,
+   "logistic_spline": 0.801,
+   "catboost": 0.802
+  },
+  "Khoa K04": {
+   "n": 4355.0,
+   "tabpfn": 0.813,
+   "hist_baseline": 0.708,
+   "logistic_base": 0.814,
+   "logistic_spline": 0.811,
+   "catboost": 0.813
+  },
+  "Khoa K05": {
+   "n": 3891.0,
+   "tabpfn": 0.817,
+   "hist_baseline": 0.688,
+   "logistic_base": 0.813,
+   "logistic_spline": 0.811,
+   "catboost": 0.813
+  },
+  "Khoa K06": {
+   "n": 4122.0,
+   "tabpfn": 0.811,
+   "hist_baseline": 0.681,
+   "logistic_base": 0.804,
+   "logistic_spline": 0.809,
+   "catboost": 0.809
+  }
+ }
+}

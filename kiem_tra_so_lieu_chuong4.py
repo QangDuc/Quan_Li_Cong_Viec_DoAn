@@ -146,6 +146,26 @@ for tok in ("75.017", "18.755", "24.994", "34.700", "3.13.15", "10.0% (Đạt", 
             "Vượt trội", "Tăng vọt", "triệt tiêu hoàn toàn", "p < 0.001", "p < 0,001", "thấp nhất toàn hệ thống"):
     forbid(f"chuỗi cũ '{tok}'", tok)
 
+# ---------- kiểm chéo file phụ & tính nhất quán mã nguồn ----------
+bc = load_json("model", "bao_cao_muc_canh_bao.json")
+for k in ("thresholds", "test", "alert_levels", "target_check", "segments"):
+    results.append((bc.get(k) == ms.get(k), f"bao_cao_muc_canh_bao.json khớp model/metrics.json [{k}]", k))
+
+ref_tm = open(P("training_scripts", "train_model.py"), encoding="utf-8").read()
+ht_tm = open(P("hoc_tiep_mlops", "train_model.py"), encoding="utf-8").read()
+results.append((ref_tm == ht_tm, "hoc_tiep_mlops/train_model.py khớp training_scripts/train_model.py", "train_model.py"))
+
+for nb_name in ("Colab_RETRAIN_v2.ipynb", "Colab_RETRAIN_v2_seed43.ipynb", "Colab_RETRAIN_v2_seed44.ipynb"):
+    nb = load_json("colab_notebooks", nb_name)
+    nb_tm = None
+    for cell in nb.get("cells", []):
+        src = "".join(cell.get("source", []))
+        if "def pick_thresholds" in src:
+            lines = src.splitlines(keepends=True)
+            nb_tm = "".join(lines[1:]) if lines and lines[0].startswith("%%writefile") else src
+            break
+    results.append((nb_tm == ref_tm, f"{nb_name} nhúng đúng training_scripts/train_model.py", nb_name))
+
 # ---------- báo cáo ----------
 bad = [r for r in results if not r[0]]
 for ok, label, token in results:

@@ -75,15 +75,26 @@ Thêm: `tabpfn_backend.py`, `auto_job.py`, lệnh `import-tabpfn`, `retrain-auto
 Lỗi tìm thấy khi làm: (1) `cli monitor` báo NameError (các dòng in chi tiết của `compare` nằm nhầm trong nhánh `monitor`), `cli compare` chỉ in ĐẠT/KHÔNG ĐẠT: đã sửa; (2) `compare.pick_thresholds` còn bản cũ (nhảy qua chỗ vi phạm): đồng bộ với `train_model.py`; (3) /health không kích hoạt nạp lại nên job sẽ hết giờ và quay lại nhầm: /health giờ gọi `reload()` ở chế độ kho.
 Giới hạn: TabPFN thật chưa chạy; rào chắn mặc định theo quy mô mô phỏng, cần hạ cho một khoa nhỏ (xem README_HOC_TIEP mục 8).
 
-## G. Đối chiếu với bản cũ `BO_ML_HOAN_THIEN_V2_MOI_NHAT` và dọn nốt
+## I. Đối chiếu với bản cũ `BO_ML_HOAN_THIEN_V2_MOI_NHAT` và dọn nốt
 Dữ liệu (`matrix_data/`, `predictions_*.csv`, các bảng trong `reports_and_docs`) giống hệt giữa hai bản; `metrics.json` chỉ mất khóa `fast_cpu`. Chương 4 bản cũ vẫn dùng số của bộ dữ liệu trước, bản này đã thay.
 | Lỗi còn sót | Sửa | Kiểm chứng |
 |---|---|---|
 | `model/bao_cao_muc_canh_bao.json` là kết quả của bộ dữ liệu cũ (ngưỡng 0,22/0,44; AUC 0,8198; tổng 24.994), có từ bản cũ và chưa ai sửa | Tạo lại từ `model/metrics.json` (cùng cấu trúc khóa, thêm `_ghi_chu`) | [đo] bảng mức cảnh báo tính lại từ `predictions_test.csv` trùng `metrics.json` (17.172 / 4.927 / 2.809) |
 | Chú thích "mô hình nhẹ CPU" trong `train_model.py` (2 bản) và 3 notebook | Đổi thành "chạy trên CPU" | [đo] biên dịch được, hai bản `train_model.py` vẫn giống nhau, notebook đọc được bằng JSON |
 | "58 đặc trưng" trong `ml_extract.py` và `README_TICH_HOP.md` dễ lẫn với 55 đặc trưng mô hình dùng | Ghi "58 trường (mô hình dùng 55)" | |
-| Số trong chương 4 gõ tay, không có gì phát hiện khi lệch | `kiem_tra_so_lieu_chuong4.py` (94 kiểm tra), thêm vào `run_all_tests.py` | [đo] bản mới 94/94 đạt; chạy trên docx bản cũ báo 25 lỗi |
+| Số trong chương 4 gõ tay, không có gì phát hiện khi lệch | `kiem_tra_so_lieu_chuong4.py` (kiểm tra số liệu chương 4 + đối chiếu file phụ), thêm vào `run_all_tests.py` | [đo] bản mới đạt 100%; chạy trên docx bản cũ báo 25 lỗi |
 
 Giới hạn của `kiem_tra_so_lieu_chuong4.py`: chỉ kiểm tra số kỳ vọng có mặt trong văn bản, không kiểm tra đúng ô hay đúng câu; số ngoài danh sách chưa được kiểm tra. Các file kết quả chỉ lưu 5 chữ số thập phân nên 5 giá trị hòa ở chữ số cuối (ví dụ 0,37225) được chấp nhận cả hai cách làm tròn.
 Còn lại, chưa xử lý: khoảng tin cậy AUC của TabPFN có hai giá trị hơi khác nhau giữa `metrics.json` ([0,7962; 0,8205]) và `so_sanh_cap.json` ([0,7966; 0,8204]) do hai lần bootstrap; chương 4 dùng giá trị sau. Chưa tìm nguyên nhân 8/11 lần học tiếp bị từ chối trong mô phỏng.
+
+## J. Đợt rà soát cuối V4 (2026-11-03)
+| Lỗi / Điểm cần hoàn thiện | Sửa | Kiểm chứng |
+|---|---|---|
+| 3 notebook trong `colab_notebooks/` còn nhúng bản cũ của `pick_thresholds` (lệch 6 dòng dừng sớm so với `training_scripts/train_model.py`) | Dựng lại cả 3 notebook từ `training_scripts/train_model.py` | [đo] so khớp từng dòng giữa `training_scripts/train_model.py`, `hoc_tiep_mlops/train_model.py` và 3 notebook = 0 dòng lệch |
+| `HOI_DAP_BAO_VE.md` câu 9 ghi "chỉ ~4% dòng mô phỏng rơi vào nhóm giảng viên mới" | Sửa đúng số đo trên bộ v2: 1,05% (lịch sử < 5 việc), 0,76% trên tập test (189/24.908 dòng), 0,29% có cờ `is_cold_start = 1` | [đo] khớp `metrics.json` và tập dữ liệu v2 |
+| `README_HOC_TIEP.md` mục 5 tiêu đề ghi "chưa tự động, chưa kiểm chứng" mâu thuẫn với mục 8 | Đổi tiêu đề mục 5 thành "Đường bán thủ công cho TabPFN (khi chạy huấn luyện trên Colab, máy chủ không có GPU)" và dẫn chiếu rõ sang mục 8 | [đo] |
+| `NHAT_KY_SUA_LOI.md` trùng nhãn `## G`; `README_HUONG_DAN.md` tiêu đề còn ghi `v3` và `15 kiểm thử` | Đổi mục G thứ hai thành `## I`; cập nhật `README_HUONG_DAN.md` lên `v4` và `21 kiểm thử (15 + 6)` | [đo] |
+| `kiem_tra_so_lieu_chuong4.py` chưa kiểm tra file phụ (`model/bao_cao_muc_canh_bao.json`, 3 notebook Colab) khớp `metrics.json` và `train_model.py` | Bổ sung kiểm tra đối chiếu `bao_cao_muc_canh_bao.json` với `model/metrics.json` và kiểm tra mã nhúng trong 3 notebook khớp `training_scripts/train_model.py` | [đo] `run_all_tests.py` đạt 100% |
+| `service/ml_extract.py` chưa đối chiếu tên cột ngày giao với `app/models.py` của backend | Bổ sung `.join(Task)` và lấy `a.task.assigned_at` khớp cột `Task.assigned_at` trong `models.py` | [đo] đối chiếu trực tiếp với `backend/app/models.py` |
+
 

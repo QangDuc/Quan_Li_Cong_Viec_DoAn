@@ -39,7 +39,7 @@ Mã lỗi: 503 mô hình chưa sẵn sàng (không âm thầm đổi mô hình),
 Một yêu cầu được xử lý tại một thời điểm (có khóa); chạy 1 worker uvicorn.
 
 ## 5. Việc PHẢI xác nhận trước khi chạy thật
-1. **Tên cột ngày giao** trong `models.TaskAssignment`: `ml_extract.py` lấy `assigned_at` rồi `created_at`. Nếu khác, sửa dòng `"assigned_at": ...`. Sai thì `hist_late_last5` lệch ~24% số dòng (đã đo).
+1. **Tên cột ngày giao** trong `models.Task` / `models.TaskAssignment`: `ml_extract.py` lấy `a.task.assigned_at` (hoặc `a.assigned_at` / `a.created_at`), khớp với cột `Task.assigned_at` và `TaskAssignment.task_id` trong `app/models.py` của backend.
 2. **Giờ công của việc đang mở** (`effort_hours` trong `ml_extract`): trong dữ liệu mô phỏng là `estimated_effort_hours` (giờ công ước lượng); web phải truyền cùng ý nghĩa.
 3. **`expected_duration_days`** (thời lượng điển hình): web phải lấy từ danh mục loại việc, cùng thang với dữ liệu huấn luyện (xem `matrix_data/task_catalog_norm.csv`).
 4. **Giá trị phân loại**: `department_ml`, `task_type`, `assignment_channel`... phải khớp danh sách lúc huấn luyện. Giá trị lạ không gây lỗi nhưng được coi là thiếu; dịch vụ báo ở `unseen_categories` và hạ `low_confidence`.

@@ -1,0 +1,14 @@
+[
+ {
+  "ts": "2025-12-31 00:00:00",
+  "event": "register",
+  "version": "v0001"
+ },
+ {
+  "ts": "2025-12-31 00:00:00",
+  "event": "promote",
+  "version": "v0001",
+  "previous": null,
+  "reason": "khởi tạo"
+ }
+]
