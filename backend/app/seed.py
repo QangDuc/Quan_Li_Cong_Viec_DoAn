@@ -759,6 +759,8 @@ def seed(reset: bool = False):
 
         for spec in gv1_tasks_spec:
             sci_id = school_map[spec["school_code"]].id if spec["school_code"] else None
+            ev_name = f"MinhChung_{spec['code']}.pdf" if spec["progress_pct"] == 100 else None
+            ev_url = "/uploads/evidence/MinhChung_KetQua_CongViec_HUIT.txt" if spec["progress_pct"] == 100 else None
             t = Task(
                 code=spec["code"],
                 title=spec["title"],
@@ -780,6 +782,8 @@ def seed(reset: bool = False):
                 current_deadline=spec["current_deadline"],
                 status=spec["status"],
                 created_by=dean.id,
+                reviewer_id=tbm1.id if "HK1" in spec["code"] else dean.id,
+                lead_lecturer_id=gv1.id,
                 plan_id=spec["plan_id"],
                 created_at=spec["assigned_at"]
             )
@@ -789,6 +793,9 @@ def seed(reset: bool = False):
             a = TaskAssignment(
                 task_id=t.id,
                 lecturer_id=gv1.id,
+                is_lead=True,
+                latest_evidence_name=ev_name,
+                latest_evidence_url=ev_url,
                 progress_pct=spec["progress_pct"],
                 status=spec["status"],
                 completed_at=spec["completed_at"],
@@ -821,6 +828,8 @@ def seed(reset: bool = False):
                     assignment_id=a.id,
                     progress_pct=100,
                     note="Đã hoàn tất 100% và nộp hồ sơ nghiệm thu lên hệ thống.",
+                    evidence_file_name=ev_name,
+                    evidence_file_url=ev_url,
                     created_by=gv1.id,
                     created_at=spec["completed_at"]
                 ))
@@ -980,6 +989,144 @@ def seed(reset: bool = False):
                 actual_is_late=False,
                 resolved_at=comp_dt
             ))
+
+        # --- Seed Công việc Nhóm (3 người, có 1 Người phụ trách chính & phân chia việc thành viên) ---
+        grp_tt = pick_tt(["Tự đánh giá", "kiểm định"], 1)
+        grp_task = Task(
+            code="CV-2610-NHOM01",
+            title="Xây dựng Hồ sơ Tự đánh giá & Minh chứng Kiểm định AUN-QA ngành CNPM (Nhóm 3 GV)",
+            description="Công việc nhóm cấp Khoa: ThS. Nguyễn Minh Khoa phụ trách chính, phân chia tiêu chuẩn cho các thành viên.",
+            task_type_id=grp_tt.id,
+            scale="quy mô lớn",
+            priority="Khẩn cấp",
+            complexity="Cao",
+            assignment_mode="Group",
+            assignment_level="Khoa",
+            assignment_channel="Hệ thống",
+            subtask_count=3,
+            dependency_count=2,
+            require_external_input=True,
+            require_approval=True,
+            assigned_at=datetime.combine(today - timedelta(days=10), datetime.min.time()),
+            original_deadline=today + timedelta(days=12),
+            current_deadline=today + timedelta(days=12),
+            status=ST_DOING,
+            created_by=dean.id,
+            reviewer_id=tbm1.id,
+            lead_lecturer_id=gv1.id,
+            created_at=datetime.combine(today - timedelta(days=10), datetime.min.time())
+        )
+        db.add(grp_task)
+        db.flush()
+
+        grp_members = [
+            (gv1, True, 60, "Chủ trì chung & tổng hợp Tiêu chuẩn 1, 2, 3", 0.24, "Trung bình"),
+            (gv2, False, 80, "Phụ trách thu thập minh chứng Tiêu chuẩn 4, 5 (Đội ngũ & Sinh viên)", 0.11, "Thấp"),
+            (gv3, False, 45, "Phụ trách rà soát biểu mẫu khảo sát Tiêu chuẩn 6, 7", 0.35, "Trung bình"),
+        ]
+        for m_user, is_lead_m, pct_m, note_m, prob_m, lvl_m in grp_members:
+            ga = TaskAssignment(
+                task_id=grp_task.id,
+                lecturer_id=m_user.id,
+                is_lead=is_lead_m,
+                member_task_note=note_m,
+                latest_evidence_name="MinhChung_SoBo_AUNQA.pdf" if pct_m >= 60 else None,
+                latest_evidence_url="/uploads/evidence/MinhChung_KetQua_CongViec_HUIT.txt" if pct_m >= 60 else None,
+                progress_pct=pct_m,
+                status=ST_DOING,
+            )
+            db.add(ga)
+            db.flush()
+            db.add(RiskPrediction(
+                task_id=grp_task.id,
+                assignment_id=ga.id,
+                lecturer_id=m_user.id,
+                trigger="assign",
+                status="ok",
+                probability=prob_m,
+                level=lvl_m,
+                uncertainty=0.025,
+                top_factors=json.dumps([{"feature": "accreditation_flag", "direction": "tăng rủi ro", "delta_logit": 0.38}], ensure_ascii=False),
+                recommendation="Công việc nhóm kiểm định: Trưởng nhóm cần đôn đốc tiến độ các thành viên hàng tuần.",
+                low_confidence=(m_user.id == gv3.id),
+                model_version="2026-10-10T01:49:15",
+                latency_ms=30,
+                created_at=datetime.combine(today - timedelta(days=10), datetime.min.time()),
+                predicted_at=datetime.combine(today - timedelta(days=10), datetime.min.time()),
+            ))
+
+        # --- Seed Công việc cho tất cả các Giảng viên còn lại (K02, K03, K04) để mỗi GV đăng nhập đều có việc ---
+        other_gv_keys = [k for k in users_by_username.keys() if k.startswith("gv_k02") or k.startswith("gv_k03") or k.startswith("gv_k04")]
+        for g_idx, g_key in enumerate(other_gv_keys):
+            lec_u = users_by_username[g_key]
+            dept_num = g_key.split("_")[1]  # k02, k03, k04
+            tbm_u = users_by_username.get(f"tbm_{dept_num}", dean)
+            # Tạo 2 công việc cho mỗi giảng viên (1 hoàn thành, 1 đang làm hoặc quá hạn)
+            for t_i in range(2):
+                tt_o = tt_list[(g_idx * 2 + t_i) % len(tt_list)]
+                is_done_task = (t_i == 0)
+                is_late_sample = (g_idx % 3 == 0 and is_done_task)
+                is_overdue_open = (g_idx % 4 == 1 and not is_done_task)
+                ass_d = datetime.now() - timedelta(days=20 if is_done_task else 10)
+                orig_dl = (ass_d + timedelta(days=12)).date() if is_done_task else (
+                    today - timedelta(days=3) if is_overdue_open else today + timedelta(days=9)
+                )
+                comp_d = (ass_d + timedelta(days=15 if is_late_sample else 10)) if is_done_task else None
+                t_other = Task(
+                    code=f"CV-2610-{dept_num.upper()}-{g_idx+1}{t_i+1}",
+                    title=f"{tt_o.name} ({lec_u.full_name})",
+                    description=f"Công việc chuyên môn phân công cho {lec_u.full_name} thuộc {lec_u.department.name if lec_u.department else 'Khoa CNTT'}.",
+                    task_type_id=tt_o.id,
+                    scale="quy mô chuẩn",
+                    priority="Cao" if is_overdue_open else "Trung bình",
+                    complexity="Trung bình",
+                    assignment_mode="Individual",
+                    assignment_level="Bộ môn",
+                    assigned_at=ass_d,
+                    original_deadline=orig_dl,
+                    current_deadline=orig_dl,
+                    status=ST_DONE if is_done_task else ST_DOING,
+                    created_by=tbm_u.id,
+                    reviewer_id=tbm_u.id,
+                    lead_lecturer_id=lec_u.id,
+                    created_at=ass_d
+                )
+                db.add(t_other)
+                db.flush()
+                a_other = TaskAssignment(
+                    task_id=t_other.id,
+                    lecturer_id=lec_u.id,
+                    is_lead=True,
+                    latest_evidence_name=f"MinhChung_{t_other.code}.pdf" if is_done_task else None,
+                    latest_evidence_url="/uploads/evidence/MinhChung_KetQua_CongViec_HUIT.txt" if is_done_task else None,
+                    progress_pct=100 if is_done_task else 45,
+                    status=ST_DONE if is_done_task else ST_DOING,
+                    completed_at=comp_d,
+                    is_late=is_late_sample if is_done_task else None,
+                    is_late_current=is_late_sample if is_done_task else None,
+                    delay_days=(3 if is_late_sample else -2) if is_done_task else None
+                )
+                db.add(a_other)
+                db.flush()
+                db.add(RiskPrediction(
+                    task_id=t_other.id,
+                    assignment_id=a_other.id,
+                    lecturer_id=lec_u.id,
+                    trigger="assign",
+                    status="ok",
+                    probability=0.52 if (is_late_sample or is_overdue_open) else 0.14,
+                    level="Cao" if (is_late_sample or is_overdue_open) else "Thấp",
+                    uncertainty=0.022,
+                    top_factors=json.dumps([{"feature": "lead_vs_expected_ratio", "direction": "tăng rủi ro", "delta_logit": 0.41}], ensure_ascii=False),
+                    recommendation="Theo dõi sát tiến độ thực hiện." if (is_late_sample or is_overdue_open) else "Tiến độ bình thường.",
+                    low_confidence=False,
+                    model_version="2026-10-10T01:49:15",
+                    latency_ms=25,
+                    created_at=ass_d,
+                    predicted_at=ass_d,
+                    actual_is_late=is_late_sample if is_done_task else None,
+                    resolved_at=comp_d
+                ))
 
         print("8. Seed Thông báo mẫu (FR-02)...")
         db.add_all([

@@ -8,14 +8,19 @@ def _env(key, default=None):
     return default if v is None or v == "" else v
 
 
-# Mặc định: SQL Server LocalDB trên máy phát triển Windows. Docker Compose ghi đè bằng DATABASE_URL.
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_SQLITE_FILE = os.path.join(BASE_DIR, "qlcv.db")
+_DEFAULT_SQLITE = f"sqlite:///{_SQLITE_FILE.replace(os.sep, '/')}"
 _DEFAULT_ODBC = "Driver={ODBC Driver 17 for SQL Server};Server=(localdb)\\MSSQLLocalDB;Database=qlcv;Trusted_Connection=yes;"
-DATABASE_URL = _env("DATABASE_URL", "mssql+pyodbc:///?odbc_connect=" + quote_plus(_DEFAULT_ODBC))
+
+# Ưu tiên biến môi trường; nếu file qlcv.db tồn tại thì mặc định dùng SQLite để chạy tức thì
+_default_db = _DEFAULT_SQLITE if os.path.exists(_SQLITE_FILE) else ("mssql+pyodbc:///?odbc_connect=" + quote_plus(_DEFAULT_ODBC))
+DATABASE_URL = _env("DATABASE_URL", _default_db)
 
 JWT_SECRET = _env("JWT_SECRET", "doi-khoa-bi-mat-nay-khi-trien-khai")
 JWT_EXPIRE_MINUTES = int(_env("JWT_EXPIRE_MINUTES", "480"))
 
-ML_SERVICE_URL = _env("ML_SERVICE_URL", "http://localhost:8001")
+ML_SERVICE_URL = _env("ML_SERVICE_URL", "http://127.0.0.1:8001")
 ML_TIMEOUT_SECONDS = float(_env("ML_TIMEOUT_SECONDS", "4"))          # quá thời gian -> lưu "chưa có dự đoán", tính lại nền
 ML_RETRY_INTERVAL_SECONDS = int(_env("ML_RETRY_INTERVAL_SECONDS", "60"))
 ML_BACKGROUND_TIMEOUT_SECONDS = float(_env("ML_BACKGROUND_TIMEOUT_SECONDS", "120"))

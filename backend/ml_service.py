@@ -145,6 +145,16 @@ class PredictResponse(BaseModel):
     model_version: str
 
 
+class RetrainItem(BaseModel):
+    features: Dict[str, Any]
+    is_late: int
+
+
+class RetrainRequest(BaseModel):
+    records: List[RetrainItem]
+    trigger: str = "manual"
+
+
 class MLModelWrapper:
     def __init__(self):
         self.bundle = None
@@ -152,6 +162,10 @@ class MLModelWrapper:
         self.bag_clfs = []
         self.engine_type = "unloaded"
         self.model_version = "unloaded"
+        self.retrain_count = 0
+        self.last_retrained_at = None
+        self.live_samples_count = 0
+        self.retrain_history = []
         self._load()
 
     def _load(self):
@@ -167,7 +181,7 @@ class MLModelWrapper:
             except Exception as e:
                 logger.warning(f"Lỗi load metrics: {e}")
 
-        use_tabpfn_gpu = os.environ.get("USE_TABPFN_GPU", "auto")
+        use_tabpfn_gpu = os.environ.get("USE_TABPFN_GPU", "0")
         loaded_tabpfn = False
         if use_tabpfn_gpu != "0":
             try:
@@ -298,6 +312,83 @@ class MLModelWrapper:
             "model_version": self.model_version,
         }
 
+    def retrain_online(self, records: List[RetrainItem], trigger: str = "manual") -> Dict[str, Any]:
+        """Huấn luyện cập nhật trực tiếp (Online / Continual Learning) từ dữ liệu công việc thực tế."""
+        if not self.bundle:
+            raise RuntimeError("Mô hình gốc chưa được nạp.")
+        if not records:
+            raise ValueError("Không có bản ghi dữ liệu thực tế nào để huấn luyện.")
+
+        t0 = time.time()
+        rows = [r.features for r in records]
+        y_live = np.array([1 if r.is_late else 0 for r in records], dtype=int)
+
+        df_live = pd.DataFrame(rows)
+        eng_live = _engineer(df_live)
+        X_live = eng_live.reindex(columns=self.bundle["features"])
+        Xe_live = _apply_encoder(self.bundle["encoder"], X_live).values
+
+        # Đánh giá trước khi huấn luyện lại trên tập dữ liệu thực tế
+        p_before, _ = self._prob_detail(X_live)
+        pred_before = (p_before >= 0.35).astype(int)
+        acc_before = float(np.mean(pred_before == y_live) * 100.0)
+        brier_before = float(np.mean((p_before - y_live) ** 2))
+
+        # Nhân bản trọng số dữ liệu thực tế mới để mô hình thích nghi nhanh với phân phối vận hành hiện tại
+        repeat_factor = max(5, min(25, 500 // max(1, len(records))))
+        X_aug = np.repeat(Xe_live, repeat_factor, axis=0)
+        y_aug = np.repeat(y_live, repeat_factor, axis=0)
+
+        new_clfs = []
+        cat_idx = self.bundle.get("cat_idx") or None
+        for k, (Xc, yc) in enumerate(self.bundle["contexts"]):
+            Xc_arr = Xc.values if hasattr(Xc, "values") else np.asarray(Xc)
+            yc_arr = yc.values if hasattr(yc, "values") else np.asarray(yc)
+            X_comb = np.vstack([Xc_arr, X_aug])
+            y_comb = np.concatenate([yc_arr, y_aug])
+
+            clf = HistGradientBoostingClassifier(
+                max_iter=160,
+                learning_rate=0.05,
+                max_depth=6,
+                categorical_features=cat_idx,
+                random_state=42 + k + self.retrain_count,
+            )
+            clf.fit(X_comb, y_comb)
+            new_clfs.append(clf)
+
+        self.bag_clfs = new_clfs
+        self.retrain_count += 1
+        self.live_samples_count = len(records)
+        self.last_retrained_at = time.strftime("%Y-%m-%d %H:%M:%S")
+        self.model_version = f"Online-v{self.retrain_count} (+{len(records)} mẫu thực tế • {self.last_retrained_at})"
+
+        # Đánh giá sau khi huấn luyện lại
+        p_after, _ = self._prob_detail(X_live)
+        pred_after = (p_after >= 0.35).astype(int)
+        acc_after = float(np.mean(pred_after == y_live) * 100.0)
+        brier_after = float(np.mean((p_after - y_live) ** 2))
+        duration_s = round(time.time() - t0, 2)
+
+        entry = {
+            "version": self.model_version,
+            "retrain_count": self.retrain_count,
+            "trigger": trigger,
+            "live_samples": len(records),
+            "late_samples": int(np.sum(y_live == 1)),
+            "on_time_samples": int(np.sum(y_live == 0)),
+            "acc_before": round(acc_before, 1),
+            "acc_after": round(acc_after, 1),
+            "brier_before": round(brier_before, 4),
+            "brier_after": round(brier_after, 4),
+            "duration_seconds": duration_s,
+            "trained_at": self.last_retrained_at,
+        }
+        self.retrain_history.insert(0, entry)
+        self.retrain_history = self.retrain_history[:20]
+        logger.info(f"Đã huấn luyện trực tuyến {self.model_version} trong {duration_s}s (Acc: {acc_before:.1f}% -> {acc_after:.1f}%)")
+        return entry
+
 
 app = FastAPI(title="HUIT Task Risk Prediction ML Service", version="1.0.0")
 model_wrapper = MLModelWrapper()
@@ -313,6 +404,10 @@ def health():
         "features_count": len(model_wrapper.bundle["features"]) if model_wrapper.bundle else 0,
         "thresholds": model_wrapper.bundle.get("thresholds") if model_wrapper.bundle else None,
         "n_bags": len(model_wrapper.bag_clfs),
+        "retrain_count": model_wrapper.retrain_count,
+        "last_retrained_at": model_wrapper.last_retrained_at,
+        "live_samples_count": model_wrapper.live_samples_count,
+        "retrain_history": model_wrapper.retrain_history,
     }
 
 
@@ -322,6 +417,15 @@ def predict(req: PredictRequest):
         return model_wrapper.predict(req.features)
     except Exception as e:
         logger.error(f"Lỗi suy luận: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/retrain")
+def retrain(req: RetrainRequest):
+    try:
+        return model_wrapper.retrain_online(req.records, trigger=req.trigger)
+    except Exception as e:
+        logger.error(f"Lỗi huấn luyện trực tuyến: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

@@ -55,7 +55,18 @@ class TaskCreate(BaseModel):
     estimated_effort_hours: Optional[float] = None
     original_deadline: date
     lecturer_ids: List[int] = Field(..., min_length=1)
+    lead_lecturer_id: Optional[int] = None
+    reviewer_id: Optional[int] = None
+    member_notes: Optional[Dict[str, str]] = None
     plan_id: Optional[int] = None
+
+class GroupDelegateMemberItem(BaseModel):
+    lecturer_id: int
+    member_task_note: Optional[str] = None
+
+class GroupDelegateRequest(BaseModel):
+    members: List[GroupDelegateMemberItem]
+    lead_lecturer_id: Optional[int] = None
 
 class TaskRiskPreviewRequest(BaseModel):
     title: Optional[str] = "Dự kiến phân công"
@@ -75,6 +86,9 @@ class TaskRiskPreviewRequest(BaseModel):
 class ProgressUpdateCreate(BaseModel):
     progress_pct: int = Field(..., ge=0, le=100)
     note: Optional[str] = None
+    lecturer_id: Optional[int] = None
+    evidence_file_name: Optional[str] = None
+    evidence_file_url: Optional[str] = None
 
 # --- Extension ---
 class ExtensionCreate(BaseModel):

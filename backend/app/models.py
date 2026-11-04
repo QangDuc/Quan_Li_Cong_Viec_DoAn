@@ -164,6 +164,8 @@ class Task(Base):
     current_deadline: Mapped[date] = mapped_column(Date)
     status: Mapped[str] = mapped_column(Unicode(30), default=ST_NEW)
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    reviewer_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    lead_lecturer_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     plan_id: Mapped[int | None] = mapped_column(ForeignKey("plans.id"))
     is_simulated: Mapped[bool] = mapped_column(Boolean, default=False)   # dữ liệu lịch sử mô phỏng (seed)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
@@ -173,6 +175,8 @@ class Task(Base):
     assignments: Mapped[list["TaskAssignment"]] = relationship(back_populates="task", order_by="TaskAssignment.id")
     extensions: Mapped[list["ExtensionRequest"]] = relationship(back_populates="task", order_by="ExtensionRequest.id")
     creator: Mapped[User | None] = relationship(foreign_keys=[created_by])
+    reviewer: Mapped[User | None] = relationship(foreign_keys=[reviewer_id])
+    lead_lecturer: Mapped[User | None] = relationship(foreign_keys=[lead_lecturer_id])
 
 
 class TaskAssignment(Base):
@@ -183,6 +187,10 @@ class TaskAssignment(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     task_id: Mapped[int] = mapped_column(ForeignKey("tasks.id"))
     lecturer_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    is_lead: Mapped[bool] = mapped_column(Boolean, default=False)
+    member_task_note: Mapped[str | None] = mapped_column(Unicode(500))
+    latest_evidence_name: Mapped[str | None] = mapped_column(Unicode(300))
+    latest_evidence_url: Mapped[str | None] = mapped_column(Unicode(500))
     progress_pct: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[str] = mapped_column(Unicode(30), default=ST_NEW)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime)
@@ -201,6 +209,8 @@ class ProgressUpdate(Base):
     assignment_id: Mapped[int] = mapped_column(ForeignKey("task_assignments.id"))
     progress_pct: Mapped[int] = mapped_column(Integer)
     note: Mapped[str | None] = mapped_column(Unicode(1000))
+    evidence_file_name: Mapped[str | None] = mapped_column(Unicode(300))
+    evidence_file_url: Mapped[str | None] = mapped_column(Unicode(500))
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 

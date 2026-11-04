@@ -1,5 +1,17 @@
 export const API_BASE = "http://localhost:8000/api";
 
+export type Role = "admin" | "manager" | "lecturer";
+
+export interface User {
+  id: number;
+  username: string;
+  full_name: string;
+  email: string;
+  role: Role;
+  department?: string | null;
+}
+
+
 export const FEATURE_LABELS_VI: Record<string, string> = {
   lead_time_days: "Số ngày từ lúc giao đến hạn chót",
   expected_duration_days: "Thời lượng thực hiện điển hình",

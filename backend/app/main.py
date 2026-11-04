@@ -1,9 +1,11 @@
 """
 Ứng dụng FastAPI chính cho Backend Hệ thống Quản lý Công việc HUIT.
-Gộp các routers: Auth, Users, Tasks, Reports, Common, AI Assistant.
+Gộp các routers: Auth, Users, Tasks, Reports, Common.
 """
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app import config
 from app.routers_auth import router as auth_router, user_router
@@ -17,6 +19,11 @@ app = FastAPI(
     description="Hệ thống quản lý công việc và tối ưu hóa phân công bằng Học máy tại Khoa CNTT - CNTT-KLCN184",
     version="1.0.0"
 )
+
+# Thư mục lưu file minh chứng tiến độ
+UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "uploads")
+os.makedirs(os.path.join(UPLOAD_DIR, "evidence"), exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 # CORS Middleware
 app.add_middleware(

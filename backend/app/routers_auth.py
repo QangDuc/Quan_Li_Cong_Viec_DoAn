@@ -5,10 +5,32 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.models import User, LecturerProfile, Department, ROLES, ROLE_LECTURER
 from app.security import verify_password, hash_password, create_token, password_problem
-from app.deps import current_user, admin_only
+from app.deps import current_user, admin_only, manager_or_admin
 from app.schemas import LoginRequest, TokenResponse, ChangePasswordRequest, UserCreate, UserUpdate
 
 router = APIRouter(prefix="/api/auth", tags=["Auth"])
+
+@router.get("/accounts-directory", dependencies=[Depends(admin_only)])
+def get_accounts_directory(db: Session = Depends(get_db)):
+    """Danh bạ toàn bộ tài khoản giảng viên / quản lý (chỉ dành riêng cho Quản trị viên Hệ thống Admin)."""
+    users = db.query(User).filter_by(is_active=True).all()
+    res = []
+    for u in users:
+        default_pwd = "Admin@123" if u.role == "admin" else ("Manager@123" if u.role == "manager" else "Lecturer@123")
+        res.append({
+            "id": u.id,
+            "username": u.username,
+            "full_name": u.full_name,
+            "role": u.role,
+            "email": u.email,
+            "department_id": u.department_id,
+            "department_name": u.department.name if u.department else "Toàn Khoa CNTT",
+            "lecturer_code": u.profile.lecturer_code if u.profile else None,
+            "academic_rank": u.profile.academic_rank if u.profile else None,
+            "degree": u.profile.degree if u.profile else None,
+            "default_password": default_pwd
+        })
+    return res
 
 @router.post("/login", response_model=TokenResponse)
 def login(req: LoginRequest, db: Session = Depends(get_db)):
@@ -93,7 +115,7 @@ def list_users(db: Session = Depends(get_db), _: User = Depends(current_user)):
         })
     return res
 
-@user_router.post("", dependencies=[Depends(admin_only)])
+@user_router.post("", dependencies=[Depends(manager_or_admin)])
 def create_user(req: UserCreate, db: Session = Depends(get_db)):
     if db.query(User).filter_by(username=req.username).first():
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Tên đăng nhập đã tồn tại")

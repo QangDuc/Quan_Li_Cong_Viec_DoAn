@@ -92,7 +92,7 @@ export const LecturerEvaluationView: React.FC<Props> = ({ token, currentUser, us
                 Mã GV: {lecturer.lecturer_code}
               </span>
               <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                Hồ sơ Giả lập 1 Năm ({academicYear})
+                Hồ sơ Công tác Năm học ({academicYear})
               </span>
             </div>
             <p className="text-sm text-slate-500 mt-0.5">
@@ -372,6 +372,9 @@ export const LecturerEvaluationView: React.FC<Props> = ({ token, currentUser, us
                         <div className="text-amber-700 font-semibold">Gia hạn: {t.current_deadline}</div>
                       )}
                       {t.completed_at && <div className="text-emerald-700">Xong: {t.completed_at}</div>}
+                      {t.reviewer_name && (
+                        <div className="text-slate-500 mt-0.5">Kiểm tra: <b>{t.reviewer_name}</b></div>
+                      )}
                     </td>
                     <td className="p-3.5 text-center font-bold text-indigo-700">
                       {t.conversion_hours}h
@@ -397,6 +400,22 @@ export const LecturerEvaluationView: React.FC<Props> = ({ token, currentUser, us
                             : t.delay_days < 0
                             ? `Sớm ${Math.abs(t.delay_days)} ngày`
                             : "Đúng hạn"}
+                        </div>
+                      )}
+                      {t.latest_evidence_name && (
+                        <div className="mt-1">
+                          <a
+                            href={
+                              t.latest_evidence_url?.startsWith("http")
+                                ? t.latest_evidence_url
+                                : `${API_BASE.replace(/\/api$/, "")}${t.latest_evidence_url}`
+                            }
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[11px] text-emerald-700 hover:underline font-semibold"
+                          >
+                            Minh chứng: {t.latest_evidence_name}
+                          </a>
                         </div>
                       )}
                     </td>

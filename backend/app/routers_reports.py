@@ -617,6 +617,8 @@ def get_lecturer_evaluation(
                 "is_correct": is_correct
             })
 
+        reviewer_u = t.reviewer if t.reviewer else t.creator
+        reviewer_name = reviewer_u.full_name if reviewer_u else (t.creator.full_name if t.creator else "Hệ thống")
         task_records.append({
             "task_id": t.id,
             "code": t.code,
@@ -627,6 +629,12 @@ def get_lecturer_evaluation(
             "semester": sem_key,
             "priority": t.priority,
             "complexity": t.complexity,
+            "assignment_mode": t.assignment_mode,
+            "is_lead": bool(a.is_lead or t.lead_lecturer_id == a.lecturer_id),
+            "member_task_note": a.member_task_note,
+            "reviewer_name": reviewer_name,
+            "latest_evidence_name": a.latest_evidence_name,
+            "latest_evidence_url": a.latest_evidence_url,
             "assigned_at": t.assigned_at.date().isoformat(),
             "original_deadline": t.original_deadline.isoformat(),
             "current_deadline": t.current_deadline.isoformat(),
@@ -758,7 +766,75 @@ def get_lecturer_evaluation(
     }
 
 
-# --- Trích xuất báo cáo Excel (FR-05) ---
+# --- Trích xuất báo cáo Excel (FR-05) & Danh sách Trễ hạn ---
+def _style_worksheet(ws, title_line1: str, title_line2: str, subtitle_line3: str, headers: list[str], header_color: str = "1E3A8A"):
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    num_cols = len(headers)
+    last_col_letter = get_column_letter(max(1, num_cols))
+
+    ws.merge_cells(f"A1:{last_col_letter}1")
+    ws["A1"] = title_line1
+    ws["A1"].font = Font(name="Arial", size=11, bold=True, color="1E293B")
+    ws["A1"].alignment = Alignment(horizontal="center", vertical="center")
+
+    ws.merge_cells(f"A2:{last_col_letter}2")
+    ws["A2"] = title_line2
+    ws["A2"].font = Font(name="Arial", size=14, bold=True, color=header_color)
+    ws["A2"].alignment = Alignment(horizontal="center", vertical="center")
+
+    ws.merge_cells(f"A3:{last_col_letter}3")
+    ws["A3"] = subtitle_line3
+    ws["A3"].font = Font(name="Arial", size=10, italic=True, color="475569")
+    ws["A3"].alignment = Alignment(horizontal="center", vertical="center")
+
+    ws.append([])  # Row 4 trống
+
+    # Row 5: Header
+    ws.append(headers)
+    header_fill = PatternFill(start_color=header_color, end_color=header_color, fill_type="solid")
+    header_font = Font(name="Arial", size=10, bold=True, color="FFFFFF")
+    thin_border = Border(
+        left=Side(style="thin", color="CBD5E1"),
+        right=Side(style="thin", color="CBD5E1"),
+        top=Side(style="thin", color="CBD5E1"),
+        bottom=Side(style="thin", color="CBD5E1"),
+    )
+
+    for col_idx in range(1, num_cols + 1):
+        cell = ws.cell(row=5, column=col_idx)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        cell.border = thin_border
+    ws.row_dimensions[2].height = 24
+    ws.row_dimensions[5].height = 26
+    return thin_border
+
+
+def _autofit_columns(ws, thin_border):
+    from openpyxl.styles import Font, Alignment
+    from openpyxl.utils import get_column_letter
+
+    for row in ws.iter_rows(min_row=6, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
+        for cell in row:
+            cell.font = Font(name="Arial", size=10)
+            cell.border = thin_border
+            cell.alignment = Alignment(vertical="center", wrap_text=False)
+
+    for col in ws.columns:
+        max_len = 10
+        col_letter = get_column_letter(col[0].column)
+        for cell in col:
+            if cell.row in (1, 2, 3):
+                continue
+            val_str = str(cell.value or "")
+            if len(val_str) > max_len:
+                max_len = len(val_str)
+        ws.column_dimensions[col_letter].width = min(max_len + 4, 48)
+
+
 @router.get("/export-excel")
 def export_excel(
     academic_year: str = "2026-2027",
@@ -784,27 +860,53 @@ def export_excel(
 
     wb = openpyxl.Workbook()
     ws = wb.active
-    ws.title = "Báo cáo công việc"
+    ws.title = "BaoCao_CongViec"
 
     headers = [
-        "Mã CV", "Tên công việc", "Loại công việc", "Nhóm việc", "Danh mục Trường",
-        "Giảng viên", "Mã GV", "Bộ môn", "Học kỳ", "Ngày giao", "Hạn gốc", "Hạn hiện tại",
-        "Tiến độ (%)", "Trạng thái", "Trễ hạn gốc", "Độ lệch (ngày)", "Giờ chuẩn quy đổi"
+        "STT", "Mã Công việc", "Tên Công việc", "Loại Công việc", "Nhóm việc", "Danh mục Trường",
+        "Họ và tên Giảng viên", "Mã GV", "Bộ môn", "Vai trò", "Người kiểm tra tiến độ",
+        "Học kỳ", "Ngày giao", "Hạn chót gốc", "Hạn hiện tại",
+        "Tiến độ (%)", "Trạng thái", "Đánh giá hạn", "Độ lệch (ngày)", "Giờ chuẩn quy đổi", "Minh chứng"
     ]
-    ws.append(headers)
+    sem_label = semester if semester else "Cả năm học"
+    thin_border = _style_worksheet(
+        ws,
+        "TRƯỜNG ĐẠI HỌC CÔNG THƯƠNG TP.HCM (HUIT) — KHOA CÔNG NGHỆ THÔNG TIN",
+        f"BÁO CÁO TỔNG HỢP PHÂN CÔNG & TIẾN ĐỘ CÔNG VIỆC ({academic_year} - {sem_label})",
+        f"Ngày trích xuất: {datetime.now().strftime('%d/%m/%Y %H:%M')} | Tổng số bản ghi phân công: {len(assignments)}",
+        headers,
+        header_color="1E3A8A"
+    )
 
     scales = {
         (tts.task_type_id, tts.scale): (tts.conversion_hours or 0.0)
         for tts in db.query(TaskTypeScale).all()
     }
 
-    for a in assignments:
+    for idx, a in enumerate(assignments, start=1):
         conv_hrs = (
             a.task.school_item.conversion_hours
             if a.task.school_item
             else scales.get((a.task.task_type_id, a.task.scale), 0.0)
         )
+        reviewer_u = a.task.reviewer if a.task.reviewer else a.task.creator
+        reviewer_name = reviewer_u.full_name if reviewer_u else "Hệ thống"
+        role_in_task = (
+            "Phụ trách chính"
+            if (a.is_lead or a.task.lead_lecturer_id == a.lecturer_id) and a.task.assignment_mode == "Group"
+            else ("Thành viên nhóm" if a.task.assignment_mode == "Group" else "Cá nhân")
+        )
+        late_status = (
+            "Hoàn thành trễ hạn"
+            if (a.status == ST_DONE and a.is_late)
+            else (
+                "Đúng hạn"
+                if a.status == ST_DONE
+                else ("Đang quá hạn" if a.task.current_deadline < date.today() else "Trong hạn")
+            )
+        )
         ws.append([
+            idx,
             a.task.code,
             a.task.title,
             a.task.task_type.name,
@@ -813,16 +915,21 @@ def export_excel(
             a.lecturer.full_name,
             a.lecturer.profile.lecturer_code if a.lecturer.profile else "",
             a.lecturer.department.name if a.lecturer.department else "",
+            role_in_task,
+            reviewer_name,
             semester_of(a.task.assigned_at.date()),
             str(a.task.assigned_at.date()),
             str(a.task.original_deadline),
             str(a.task.current_deadline),
             a.progress_pct,
             a.status,
-            "Trễ hạn" if a.is_late else ("Đúng hạn" if a.status == ST_DONE else "Đang mở"),
+            late_status,
             a.delay_days if a.delay_days is not None else 0,
-            round(conv_hrs, 2)
+            round(conv_hrs, 2),
+            a.latest_evidence_name or "Chưa nộp"
         ])
+
+    _autofit_columns(ws, thin_border)
 
     stream = io.BytesIO()
     wb.save(stream)
@@ -836,10 +943,269 @@ def export_excel(
     )
 
 
-# --- Đối chiếu Lịch sử Dự đoán ML (FR-10) ---
+@router.get("/export-late-excel")
+def export_late_excel(
+    academic_year: str = "2026-2027",
+    semester: str | None = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user)
+):
+    """
+    Xuất riêng file Excel danh sách những người trễ hạn / công việc quá hạn với tiêu đề rõ ràng.
+    Bao gồm 2 Sheet:
+    - Sheet 1: Danh sách chi tiết công việc & giảng viên trễ hạn / quá hạn.
+    - Sheet 2: Tổng hợp thống kê trễ hạn theo từng Giảng viên.
+    """
+    query = db.query(TaskAssignment).join(Task)
+    scope = lecturer_scope(db, user)
+    if scope is not None:
+        query = query.filter(TaskAssignment.lecturer_id.in_(scope))
+
+    if semester:
+        s_date, e_date = semester_range(academic_year, semester)
+        query = query.filter(Task.original_deadline >= s_date.date(), Task.original_deadline < e_date.date())
+    else:
+        s_date, e_date = year_range(academic_year)
+        query = query.filter(Task.assigned_at >= s_date, Task.assigned_at < e_date)
+
+    all_assignments = query.order_by(Task.original_deadline.asc()).all()
+    today = date.today()
+
+    late_assignments = []
+    lecturer_totals = {}
+    for a in all_assignments:
+        lid = a.lecturer_id
+        if lid not in lecturer_totals:
+            lecturer_totals[lid] = {
+                "lecturer_code": a.lecturer.profile.lecturer_code if a.lecturer.profile else f"GV{lid:04d}",
+                "full_name": a.lecturer.full_name,
+                "department_name": a.lecturer.department.name if a.lecturer.department else "Khoa CNTT",
+                "email": a.lecturer.email or "",
+                "total_assigned": 0,
+                "completed_late": 0,
+                "overdue_open": 0,
+                "delay_days_list": [],
+                "late_codes": []
+            }
+        lecturer_totals[lid]["total_assigned"] += 1
+
+        is_completed_late = (a.status == ST_DONE and bool(a.is_late))
+        is_overdue_open = (a.status != ST_DONE and a.task.current_deadline < today)
+        if is_completed_late or is_overdue_open:
+            late_assignments.append((a, is_completed_late, is_overdue_open))
+            if is_completed_late:
+                lecturer_totals[lid]["completed_late"] += 1
+                delay_val = float(a.delay_days or max(1, (a.completed_at.date() - a.task.original_deadline).days if a.completed_at else 1))
+            else:
+                lecturer_totals[lid]["overdue_open"] += 1
+                delay_val = float((today - a.task.current_deadline).days)
+            lecturer_totals[lid]["delay_days_list"].append(delay_val)
+            lecturer_totals[lid]["late_codes"].append(a.task.code)
+
+    wb = openpyxl.Workbook()
+    ws_detail = wb.active
+    ws_detail.title = "DS_ChiTiet_TreHan"
+
+    sem_label = semester if semester else "Cả năm học"
+    headers_detail = [
+        "STT", "Mã Giảng viên", "Họ và tên Giảng viên", "Bộ môn", "Vai trò trong CV",
+        "Mã Công việc", "Tên Công việc", "Loại Công việc", "Mức ưu tiên",
+        "Người giao việc", "Người kiểm tra tiến độ",
+        "Ngày giao", "Hạn chót gốc", "Hạn chót hiện tại", "Ngày hoàn thành",
+        "Tiến độ (%)", "Phân loại trễ hạn", "Số ngày trễ (ngày)", "Minh chứng kết quả"
+    ]
+    thin_border = _style_worksheet(
+        ws_detail,
+        "TRƯỜNG ĐẠI HỌC CÔNG THƯƠNG TP.HCM (HUIT) — KHOA CÔNG NGHỆ THÔNG TIN",
+        f"BÁO CÁO DANH SÁCH GIẢNG VIÊN & CÔNG VIỆC TRỄ HẠN / QUÁ HẠN ({academic_year} - {sem_label})",
+        f"Ngày trích xuất: {datetime.now().strftime('%d/%m/%Y %H:%M')} | Tổng số trường hợp trễ / quá hạn: {len(late_assignments)}",
+        headers_detail,
+        header_color="991B1B"
+    )
+
+    for idx, (a, is_comp_late, is_over_open) in enumerate(late_assignments, start=1):
+        creator_name = a.task.creator.full_name if a.task.creator else "Hệ thống"
+        reviewer_u = a.task.reviewer if a.task.reviewer else a.task.creator
+        reviewer_name = reviewer_u.full_name if reviewer_u else creator_name
+        role_in_task = (
+            "Phụ trách chính (Chủ trì)"
+            if (a.is_lead or a.task.lead_lecturer_id == a.lecturer_id) and a.task.assignment_mode == "Group"
+            else ("Thành viên nhóm" if a.task.assignment_mode == "Group" else "Thực hiện cá nhân")
+        )
+        if is_comp_late:
+            late_type = "Hoàn thành trễ hạn"
+            delay_d = int(a.delay_days or 1)
+            comp_str = str(a.completed_at.date()) if a.completed_at else "Đã hoàn thành"
+        else:
+            late_type = "Đang quá hạn (Chưa xong)"
+            delay_d = int((today - a.task.current_deadline).days)
+            comp_str = "Chưa hoàn thành"
+
+        ws_detail.append([
+            idx,
+            a.lecturer.profile.lecturer_code if a.lecturer.profile else f"GV{a.lecturer_id:04d}",
+            a.lecturer.full_name,
+            a.lecturer.department.name if a.lecturer.department else "Khoa CNTT",
+            role_in_task,
+            a.task.code,
+            a.task.title,
+            a.task.task_type.name if a.task.task_type else "",
+            a.task.priority,
+            creator_name,
+            reviewer_name,
+            str(a.task.assigned_at.date()),
+            str(a.task.original_deadline),
+            str(a.task.current_deadline),
+            comp_str,
+            a.progress_pct,
+            late_type,
+            delay_d,
+            a.latest_evidence_name or "Chưa nộp minh chứng"
+        ])
+
+    _autofit_columns(ws_detail, thin_border)
+
+    # Sheet 2: Tổng hợp theo giảng viên có trễ hạn
+    ws_summary = wb.create_sheet(title="TongHop_GiangVien_TreHan")
+    headers_summary = [
+        "STT", "Mã Giảng viên", "Họ và tên Giảng viên", "Bộ môn", "Email liên hệ",
+        "Tổng số việc được giao", "Số việc hoàn thành trễ hạn", "Số việc đang quá hạn chưa xong",
+        "Tổng số việc trễ / quá hạn", "Tỷ lệ trễ hạn (%)", "Số ngày trễ trung bình", "Danh sách Mã CV trễ hạn"
+    ]
+    late_lecturers = [
+        v for v in lecturer_totals.values()
+        if (v["completed_late"] + v["overdue_open"]) > 0
+    ]
+    late_lecturers.sort(key=lambda x: (x["completed_late"] + x["overdue_open"]), reverse=True)
+
+    thin_border_2 = _style_worksheet(
+        ws_summary,
+        "TRƯỜNG ĐẠI HỌC CÔNG THƯƠNG TP.HCM (HUIT) — KHOA CÔNG NGHỆ THÔNG TIN",
+        f"BẢO CÁO TỔNG HỢP DANH SÁCH GIẢNG VIÊN CÓ CÔNG VIỆC TRỄ HẠN ({academic_year} - {sem_label})",
+        f"Ngày trích xuất: {datetime.now().strftime('%d/%m/%Y %H:%M')} | Tổng số giảng viên có việc trễ/quá hạn: {len(late_lecturers)}",
+        headers_summary,
+        header_color="991B1B"
+    )
+
+    for idx, item in enumerate(late_lecturers, start=1):
+        total_late = item["completed_late"] + item["overdue_open"]
+        rate = round(total_late / max(1, item["total_assigned"]) * 100, 1)
+        avg_delay = round(sum(item["delay_days_list"]) / max(1, len(item["delay_days_list"])), 1)
+        ws_summary.append([
+            idx,
+            item["lecturer_code"],
+            item["full_name"],
+            item["department_name"],
+            item["email"],
+            item["total_assigned"],
+            item["completed_late"],
+            item["overdue_open"],
+            total_late,
+            rate,
+            avg_delay,
+            ", ".join(item["late_codes"])
+        ])
+
+    _autofit_columns(ws_summary, thin_border_2)
+
+    stream = io.BytesIO()
+    wb.save(stream)
+    stream.seek(0)
+
+    filename = f"DanhSach_GiangVien_TreHan_{academic_year}_{semester or 'CaNam'}.xlsx"
+    return StreamingResponse(
+        stream,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+# --- Đối chiếu Lịch sử Dự đoán ML & Huấn luyện Trực tiếp (Online Retraining) ---
+@router.post("/ml-retrain", dependencies=[Depends(manager_or_admin)])
+def retrain_ml_online(
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user)
+):
+    """
+    Huấn luyện cập nhật trực tiếp mô hình ML dựa trên toàn bộ dữ liệu công việc thực tế đã hoàn thành trong CSDL.
+    Đồng thời cập nhật lại dự báo rủi ro cho các công việc đang mở.
+    """
+    import httpx
+    from app import config
+    from app.ml_extract import extract_features_for_assignment
+
+    done_assigns = (
+        db.query(TaskAssignment)
+        .join(Task)
+        .filter(TaskAssignment.status == ST_DONE, TaskAssignment.is_late != None)
+        .all()
+    )
+    if not done_assigns:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Chưa có công việc hoàn thành nào để huấn luyện bổ sung.")
+
+    records = []
+    for a in done_assigns:
+        pred = (
+            db.query(RiskPrediction)
+            .filter_by(assignment_id=a.id)
+            .order_by(desc(RiskPrediction.id))
+            .first()
+        )
+        feats = None
+        if pred and pred.features_json:
+            try:
+                feats = json.loads(pred.features_json)
+            except Exception:
+                feats = None
+        if not feats:
+            try:
+                feats = extract_features_for_assignment(db, a.task_id, a.lecturer_id, at=a.task.assigned_at)
+            except Exception:
+                feats = None
+        if feats:
+            records.append({
+                "features": feats,
+                "is_late": 1 if a.is_late else 0
+            })
+
+    if not records:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Không trích xuất được đặc trưng huấn luyện từ dữ liệu hiện tại.")
+
+    url = f"{config.ML_SERVICE_URL.rstrip('/')}/retrain"
+    try:
+        with httpx.Client(timeout=60.0) as client:
+            resp = client.post(url, json={"records": records, "trigger": f"online_by_{user.username}"})
+        if resp.status_code != 200:
+            raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"ML Service trả lỗi: {resp.text[:300]}")
+        train_result = resp.json()
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Không thể kết nối tới ML Service để train: {str(e)[:200]}")
+
+    # Cập nhật lại dự đoán cho các công việc đang thực hiện bằng mô hình vừa train
+    open_assigns = db.query(TaskAssignment).filter(TaskAssignment.status != ST_DONE).all()
+    refreshed = 0
+    for oa in open_assigns:
+        try:
+            predict_and_record_risk(db, oa.task_id, oa.id, oa.lecturer_id, trigger="retrain")
+            refreshed += 1
+        except Exception:
+            pass
+
+    return {
+        "message": f"Đã huấn luyện trực tiếp mô hình từ {len(records)} dữ liệu công việc thực tế và cập nhật dự báo cho {refreshed} việc đang mở!",
+        "train_result": train_result,
+        "refreshed_open_tasks": refreshed
+    }
+
+
 @router.get("/ml-accuracy")
 def get_ml_accuracy(db: Session = Depends(get_db), user: User = Depends(current_user)):
-    """Đối chiếu độ chính xác của mô hình ML giữa dự đoán và kết quả thực tế."""
+    """Đối chiếu độ chính xác của mô hình ML giữa dự đoán và kết quả thực tế kèm trạng thái huấn luyện trực tuyến."""
+    import httpx
+    from app import config
+
     query = db.query(RiskPrediction).filter(RiskPrediction.actual_is_late != None, RiskPrediction.probability != None)
 
     scope = lecturer_scope(db, user)
@@ -847,9 +1213,24 @@ def get_ml_accuracy(db: Session = Depends(get_db), user: User = Depends(current_
         query = query.filter(RiskPrediction.lecturer_id.in_(scope))
 
     preds = query.order_by(desc(RiskPrediction.predicted_at)).all()
+
+    # Lấy thông tin health/retrain từ ML Service
+    ml_health = {}
+    try:
+        with httpx.Client(timeout=1.5) as client:
+            r = client.get(f"{config.ML_SERVICE_URL.rstrip('/')}/health")
+            if r.status_code == 200:
+                ml_health = r.json()
+    except Exception:
+        pass
+
+    live_done_count = db.query(TaskAssignment).filter(TaskAssignment.status == ST_DONE, TaskAssignment.is_late != None).count()
+
     if not preds:
         return {
             "total_evaluated": 0,
+            "live_done_count": live_done_count,
+            "ml_service": ml_health,
             "high_risk": {"total_predicted": 0, "actual_late": 0, "precision": 0.0},
             "medium_risk": {"total_predicted": 0, "actual_late": 0, "late_rate": 0.0},
             "low_risk": {"total_predicted": 0, "actual_on_time": 0, "accuracy": 0.0},
@@ -884,6 +1265,8 @@ def get_ml_accuracy(db: Session = Depends(get_db), user: User = Depends(current_
 
     return {
         "total_evaluated": total,
+        "live_done_count": live_done_count,
+        "ml_service": ml_health,
         "high_risk": {
             "total_predicted": total_high,
             "actual_late": correct_high,
