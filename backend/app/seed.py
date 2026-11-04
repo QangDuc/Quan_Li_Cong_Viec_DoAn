@@ -1012,14 +1012,14 @@ def seed(reset: bool = False):
             dependency_count=2,
             require_external_input=True,
             require_approval=True,
-            assigned_at=today - timedelta(days=10),
+            assigned_at=datetime.combine(today - timedelta(days=10), datetime.min.time()),
             original_deadline=today + timedelta(days=12),
             current_deadline=today + timedelta(days=12),
             status=ST_DOING,
             created_by=dean.id,
             reviewer_id=tbm1.id,
             lead_lecturer_id=gv1.id,
-            created_at=today - timedelta(days=10)
+            created_at=datetime.combine(today - timedelta(days=10), datetime.min.time())
         )
         db.add(grp_task)
         db.flush()
@@ -1056,8 +1056,8 @@ def seed(reset: bool = False):
                 low_confidence=(m_user.id == gv3.id),
                 model_version="TabPFN v2 (9.2.0 • 4 túi ngữ cảnh, v0001)",
                 latency_ms=30,
-                created_at=today - timedelta(days=10),
-                predicted_at=today - timedelta(days=10),
+                created_at=datetime.combine(today - timedelta(days=10), datetime.min.time()),
+                predicted_at=datetime.combine(today - timedelta(days=10), datetime.min.time()),
             ))
 
         # --- Seed Công việc cho tất cả các Giảng viên còn lại (K02, K03, K04) để mỗi GV đăng nhập đều có việc ---
