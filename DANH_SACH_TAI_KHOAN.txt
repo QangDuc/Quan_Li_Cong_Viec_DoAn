@@ -1,0 +1,43 @@
+================================================================================
+   DANH SÁCH TÀI KHOẢN & MẬT KHẨU ĐĂNG NHẬP HỆ THỐNG QUẢN LÝ CÔNG VIỆC - HUIT
+   (Mở bằng Notepad hoặc bất kỳ trình đọc văn bản nào - Bấm Ctrl + F để tìm)
+================================================================================
+
+I. MẬT KHẨU MẶC ĐỊNH THEO NHÓM VAI TRÒ:
+  1. Quản trị viên (admin)            : Admin@123
+  2. Trưởng Khoa & Trưởng Bộ môn      : Manager@123
+  3. Tất cả Giảng viên                : Lecturer@123
+
+--------------------------------------------------------------------------------
+II. DANH SÁCH CHI TIẾT 18 TÀI KHOẢN TRONG HỆ THỐNG:
+--------------------------------------------------------------------------------
+
+[1] KHỐI QUẢN TRỊ & BAN CHỦ NHIỆM KHOA:
+  01. Username: admin        | Password: Admin@123    | Quản trị viên Hệ thống (Admin)
+  02. Username: truongkhoa   | Password: Manager@123  | TS. Nguyễn Văn Lễ (Trưởng Khoa CNTT)
+
+[2] BỘ MÔN CÔNG NGHỆ PHẦN MỀM (K01):
+  03. Username: tbm_k01      | Password: Manager@123  | PGS.TS. Hoàng Văn Minh (Trưởng BM CNPM - Mã: TBM01)
+  04. Username: gv_k01_1     | Password: Lecturer@123 | ThS. Nguyễn Minh Khoa (Giảng viên - Mã: GV0101 - Trưởng nhóm CV-2610-NHOM01)
+  05. Username: gv_k01_2     | Password: Lecturer@123 | TS. Trần Thị Mai Anh (Giảng viên - Mã: GV0102 - Thành viên nhóm CV-2610-NHOM01)
+  06. Username: gv_k01_3     | Password: Lecturer@123 | ThS. Lê Hoàng Nam (Giảng viên - Mã: GV0103 - Thành viên nhóm CV-2610-NHOM01)
+
+[3] BỘ MÔN HỆ THỐNG THÔNG TIN (K02):
+  07. Username: tbm_k02      | Password: Manager@123  | TS. Lê Thị Hồng Nhung (Trưởng BM HTTT - Mã: TBM02)
+  08. Username: gv_k02_1     | Password: Lecturer@123 | TS. Phạm Quốc Bảo (Giảng viên - Mã: GV0201)
+  09. Username: gv_k02_2     | Password: Lecturer@123 | ThS. Võ Thị Thanh Thảo (Giảng viên - Mã: GV0202)
+  10. Username: gv_k02_3     | Password: Lecturer@123 | ThS. Đặng Gia Huy (Giảng viên - Mã: GV0203)
+
+[4] BỘ MÔN KHOA HỌC MÁY TÍNH (K03):
+  11. Username: tbm_k03      | Password: Manager@123  | TS. Nguyễn Hữu Toàn (Trưởng BM KHMT - Mã: TBM03)
+  12. Username: gv_k03_1     | Password: Lecturer@123 | TS. Phan Hữu Phúc (Giảng viên - Mã: GV0301)
+  13. Username: gv_k03_2     | Password: Lecturer@123 | ThS. Bùi Thị Lan Hương (Giảng viên - Mã: GV0302)
+  14. Username: gv_k03_3     | Password: Lecturer@123 | ThS. Ngô Đình Tuấn (Giảng viên - Mã: GV0303)
+
+[5] BỘ MÔN MẠNG MÁY TÍNH & AN TOÀN THÔNG TIN (K04):
+  15. Username: tbm_k04      | Password: Manager@123  | TS. Phan Thanh Tùng (Trưởng BM MMT&ATTT - Mã: TBM04)
+  16. Username: gv_k04_1     | Password: Lecturer@123 | TS. Trịnh Quốc Khánh (Giảng viên - Mã: GV0401)
+  17. Username: gv_k04_2     | Password: Lecturer@123 | ThS. Đỗ Mai Phương (Giảng viên - Mã: GV0402)
+  18. Username: gv_k04_3     | Password: Lecturer@123 | ThS. Lý Minh Tâm (Giảng viên - Mã: GV0403)
+================================================================================
+
