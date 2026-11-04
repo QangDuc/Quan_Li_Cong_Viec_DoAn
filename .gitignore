@@ -26,14 +26,11 @@ frontend/dist/
 .playwright-mcp/
 playwright_*.png
 
-# Local Word / PDF thesis documents & helper scripts (allow official thesis files in docs/)
+# Local Word / PDF thesis documents & helper scripts (only track the official completed thesis document)
 *.docx
 *.doc
 *.pdf
-!docs/*.docx
-!docs/*.pdf
-!docs/**/*.docx
-!docs/**/*.pdf
+!docs/BAO_CAO_KLTN_CNTT_KLCN184_HOAN_CHINH.docx
 ~$*
 backend/scripts/generated_diagrams/
 backend/scripts/build_graduation_thesis_docx.py
