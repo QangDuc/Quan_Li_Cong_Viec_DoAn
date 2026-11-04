@@ -1,0 +1,13 @@
+{
+  "kind": "import",
+  "source": "e:\\GGCLASS\\New folder\\data\\Quan_Li_Cong_Viec_DoAn-main\\model\\risk_model.joblib",
+  "n_train": 59966,
+  "version": "v0001",
+  "sha256": "4490a68c91e59f08948aa3608bf67f1066ea9c857e72915a2f53f9ccedec889f",
+  "sklearn": "1.6.1",
+  "thresholds": [
+    0.23,
+    0.52
+  ],
+  "data_end": "2027-01-04"
+}

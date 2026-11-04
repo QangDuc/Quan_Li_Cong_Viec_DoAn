@@ -13,6 +13,10 @@ from app.db import Base
 ROLE_ADMIN, ROLE_MANAGER, ROLE_LECTURER = "admin", "manager", "lecturer"
 ROLES = (ROLE_ADMIN, ROLE_MANAGER, ROLE_LECTURER)
 
+# Pham vi phan quyen du lieu (RBAC Data Scope)
+SCOPE_SYSTEM, SCOPE_FACULTY, SCOPE_DEPARTMENT, SCOPE_SELF = "SYSTEM", "FACULTY", "DEPARTMENT", "SELF"
+DATA_SCOPES = (SCOPE_SYSTEM, SCOPE_FACULTY, SCOPE_DEPARTMENT, SCOPE_SELF)
+
 # Trạng thái công việc / phân công
 ST_NEW, ST_DOING, ST_DONE, ST_CANCELLED = "Mới giao", "Đang thực hiện", "Hoàn thành", "Đã hủy"
 EXT_PENDING, EXT_APPROVED, EXT_REJECTED = "Chờ duyệt", "Đã duyệt", "Từ chối"
@@ -269,3 +273,59 @@ class RiskPrediction(Base):
 
     task: Mapped[Task] = relationship()
     lecturer: Mapped[User] = relationship()
+
+
+# -------------------------------------------------------------
+# CAC BANG PHAN QUYEN RBAC NANG CAO (17 BANG QUAN HE THEO KLTN)
+# -------------------------------------------------------------
+class RoleDefinition(Base):
+    """Bang vai tro chuan trong he thong (RBAC)"""
+    __tablename__ = "roles"
+    code: Mapped[str] = mapped_column(Unicode(30), primary_key=True)
+    name: Mapped[str] = mapped_column(Unicode(100), nullable=False)
+    hierarchy_level: Mapped[int] = mapped_column(Integer, nullable=False)
+    default_scope: Mapped[str] = mapped_column(Unicode(40), nullable=False)
+    description: Mapped[str] = mapped_column(Unicode(500), nullable=False)
+
+
+class Permission(Base):
+    """Danh muc quyen han chi tiet theo module (32 quyen)"""
+    __tablename__ = "permissions"
+    code: Mapped[str] = mapped_column(Unicode(50), primary_key=True)
+    module: Mapped[str] = mapped_column(Unicode(80), nullable=False)
+    name: Mapped[str] = mapped_column(Unicode(150), nullable=False)
+    description: Mapped[str] = mapped_column(Unicode(500), nullable=False)
+
+
+class RolePermission(Base):
+    """Anh xa quyen cho tung vai tro"""
+    __tablename__ = "role_permissions"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    role_code: Mapped[str] = mapped_column(Unicode(30), ForeignKey("roles.code"), nullable=False)
+    permission_code: Mapped[str] = mapped_column(Unicode(50), ForeignKey("permissions.code"), nullable=False)
+    constraint_note: Mapped[str | None] = mapped_column(Unicode(300))
+
+
+class UserPermissionScope(Base):
+    """Bang anh xa quyen va pham vi du lieu da chuan hoa cua tung nguoi dung"""
+    __tablename__ = "user_permission_scopes"
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), primary_key=True)
+    username: Mapped[str] = mapped_column(Unicode(100), unique=True, nullable=False)
+    role_code: Mapped[str] = mapped_column(Unicode(30), ForeignKey("roles.code"), nullable=False)
+    scope_level: Mapped[str] = mapped_column(Unicode(30), nullable=False)
+    department_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("departments.id"))
+    scope_description: Mapped[str] = mapped_column(Unicode(300), nullable=False)
+    can_manage_users: Mapped[bool] = mapped_column(Boolean, default=False)
+    can_create_task: Mapped[bool] = mapped_column(Boolean, default=False)
+    can_assign_task: Mapped[bool] = mapped_column(Boolean, default=False)
+    can_approve_extension: Mapped[bool] = mapped_column(Boolean, default=False)
+    can_manage_norm_catalog: Mapped[bool] = mapped_column(Boolean, default=False)
+    can_import_plan: Mapped[bool] = mapped_column(Boolean, default=False)
+    can_view_ml_risk: Mapped[bool] = mapped_column(Boolean, default=False)
+    can_retrain_ml_model: Mapped[bool] = mapped_column(Boolean, default=False)
+    can_export_report: Mapped[bool] = mapped_column(Boolean, default=False)
+    can_update_own_progress: Mapped[bool] = mapped_column(Boolean, default=False)
+    can_request_extension: Mapped[bool] = mapped_column(Boolean, default=False)
+    granted_permissions_json: Mapped[str] = mapped_column(UnicodeText, nullable=False)
+    access_constraint_rule: Mapped[str] = mapped_column(Unicode(300), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, nullable=False)

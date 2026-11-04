@@ -1,6 +1,6 @@
 """
 Ứng dụng FastAPI chính cho Backend Hệ thống Quản lý Công việc HUIT.
-Gộp các routers: Auth, Users, Tasks, Reports, Common.
+Gộp các routers: Auth, Users, Tasks, Reports, Common, AI Assistant.
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,6 +10,7 @@ from app.routers_auth import router as auth_router, user_router
 from app.routers_tasks import router as task_router
 from app.routers_reports import router as report_router
 from app.routers_common import router as common_router
+from app.routers_ai import router as ai_router
 
 app = FastAPI(
     title="HUIT Task Management & ML Assignment System API",
@@ -31,6 +32,7 @@ app.include_router(user_router)
 app.include_router(task_router)
 app.include_router(report_router)
 app.include_router(common_router)
+app.include_router(ai_router)
 
 @app.get("/")
 def root():

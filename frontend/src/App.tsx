@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
   LayoutDashboard, CheckSquare, FileSpreadsheet, ShieldAlert,
-  Bell, LogOut, UserCheck, Users, KeyRound, RefreshCw, FileDown, Sparkles
+  Bell, LogOut, UserCheck, Users, KeyRound, RefreshCw, FileDown, Sparkles, Bot
 } from "lucide-react";
 
 import { API_BASE } from "./types";
@@ -9,6 +9,7 @@ import { LecturerEvaluationView } from "./components/LecturerEvaluationView";
 import { AssignTaskWithMLView } from "./components/AssignTaskWithMLView";
 import { TasksAndExtensionsView } from "./components/TasksAndExtensionsView";
 import { PlansAndCatalogView } from "./components/PlansAndCatalogView";
+import { AIAssistantView } from "./components/AIAssistantView";
 
 export default function App() {
   const [token, setToken] = useState<string | null>(localStorage.getItem("token"));
@@ -332,9 +333,7 @@ export default function App() {
       <header className="bg-slate-900 text-white shadow-md sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center font-bold text-sm shadow">
-              HUIT
-            </div>
+            <img src="/huit-logo.png" alt="HUIT" className="w-10 h-10 rounded-xl object-contain bg-white p-0.5 shadow border border-slate-700" onError={(e) => { (e.target as HTMLElement).style.display = "none"; }} />
             <div>
               <h1 className="font-bold text-base leading-tight">
                 Quản lý Công việc & Dự báo Rủi ro Học máy — Khoa CNTT
@@ -426,6 +425,7 @@ export default function App() {
               : []),
             { id: "reports", label: "Báo cáo & Hồ sơ Giảng viên", icon: LayoutDashboard },
             { id: "plans_catalog", label: "Kế hoạch năm & Định mức giờ chuẩn", icon: FileSpreadsheet },
+            { id: "ai_assistant", label: "Trợ lý AI HUIT", icon: Bot },
             ...(user?.role === "admin"
               ? [{ id: "users", label: "Quản trị Tài khoản", icon: Users }]
               : []),
@@ -653,6 +653,11 @@ export default function App() {
               fetchInitialData();
             }}
           />
+        )}
+
+        {/* TAB: TRỢ LÝ AI ĐIỀU PHỐI KHOA CNTT */}
+        {activeTab === "ai_assistant" && (
+          <AIAssistantView token={token || ""} currentUser={user} tasks={tasks} />
         )}
 
         {/* TAB: KẾ HOẠCH NĂM & ĐỊNH MỨC GIỜ CHUẨN */}
