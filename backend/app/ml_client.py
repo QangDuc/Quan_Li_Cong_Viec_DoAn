@@ -17,6 +17,7 @@ from app.ml_extract import extract_features_for_assignment
 
 logger = logging.getLogger("ml_client")
 
+
 def predict_and_record_risk(
     db: Session,
     task_id: int,
@@ -42,7 +43,7 @@ def predict_and_record_risk(
         features = extract_features_for_assignment(db, task_id, lecturer_id, at=pred_record.created_at)
         pred_record.features_json = json.dumps(features, ensure_ascii=False)
 
-        # Gọi ML Service
+        # Gọi ML Service (TabPFN v2)
         url = f"{config.ML_SERVICE_URL.rstrip('/')}/predict"
         with httpx.Client(timeout=timeout) as client:
             resp = client.post(url, json={"features": features})
@@ -61,6 +62,14 @@ def predict_and_record_risk(
             pred_record.low_confidence = data.get("low_confidence", False)
             pred_record.model_version = data.get("model_version")
             pred_record.predicted_at = datetime.now()
+            try:
+                from app import hoc_tiep_hook
+                hoc_tiep_hook.log_prediction(
+                    task_id, lecturer_id, features, pred_record.created_at,
+                    pred_record.probability, pred_record.level, pred_record.model_version
+                )
+            except Exception as e:
+                logger.warning(f"Không ghi được kho phản hồi học tiếp: {e}")
 
             # Thông báo chủ động cho Quản lý nếu rủi ro Cao (UC-02)
             if pred_record.level == "Cao":
@@ -91,7 +100,6 @@ def _notify_manager_high_risk(db: Session, task_id: int, lecturer_id: int, pred:
     lecturer = db.get(User, lecturer_id)
     dept_id = lecturer.department_id if lecturer else None
 
-    # Tìm các managers quản lý giảng viên này
     query = db.query(User).filter(User.role == ROLE_MANAGER, User.is_active == True)
     if dept_id:
         managers = query.filter((User.department_id == dept_id) | (User.department_id == None)).all()
@@ -149,3 +157,26 @@ def preview_risk_for_features(features: dict, timeout: float | None = None) -> d
             "low_confidence": False,
             "error": str(e)[:200]
         }
+
+
+def preview_risk_for_features_batch(items: list[dict], timeout: float | None = None) -> list[dict]:
+    """Gọi ML Service theo lô (/predict-batch) trên TabPFN v2 để xếp hạng nhanh toàn bộ giảng viên."""
+    if not items:
+        return []
+    timeout = timeout or max(config.ML_TIMEOUT_SECONDS, 25.0)
+    t0 = time.time()
+    try:
+        url = f"{config.ML_SERVICE_URL.rstrip('/')}/predict-batch"
+        with httpx.Client(timeout=timeout) as client:
+            resp = client.post(url, json={"items": items, "explain": True})
+        elapsed_ms = int((time.time() - t0) * 1000)
+        if resp.status_code == 200:
+            results = resp.json().get("results", [])
+            if len(results) == len(items):
+                for r in results:
+                    r["status"] = "ok"
+                    r["latency_ms"] = elapsed_ms
+                return results
+    except Exception as e:
+        logger.warning(f"Batch predict fallback ({e})")
+    return [preview_risk_for_features(f, timeout=timeout) for f in items]

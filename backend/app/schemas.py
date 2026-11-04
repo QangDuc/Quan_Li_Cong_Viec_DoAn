@@ -99,6 +99,18 @@ class ExtensionReview(BaseModel):
     status: str  # Đã duyệt / Từ chối
     review_note: Optional[str] = None
 
+class MemberEvidenceSubmitRequest(BaseModel):
+    evidence_file_name: str
+    evidence_file_url: str
+    note: Optional[str] = ""
+
+class TaskFeedbackRequest(BaseModel):
+    feedback: str
+    lecturer_id: Optional[int] = None
+    mark_status: Optional[str] = None
+    status_action: Optional[str] = None
+    progress_pct: Optional[float] = None
+
 # --- School Catalog ---
 class SchoolCatalogCreate(BaseModel):
     code: str

@@ -17,9 +17,10 @@ from app.models import (
 from app.deps import current_user, manager_or_admin, lecturer_scope, can_see_lecturer, can_see_risk
 from app.schemas import (
     TaskCreate, TaskRiskPreviewRequest, ProgressUpdateCreate,
-    ExtensionCreate, ExtensionReview, GroupDelegateRequest
+    ExtensionCreate, ExtensionReview, GroupDelegateRequest,
+    MemberEvidenceSubmitRequest, TaskFeedbackRequest
 )
-from app.ml_client import predict_and_record_risk, preview_risk_for_features
+from app.ml_client import predict_and_record_risk, preview_risk_for_features, preview_risk_for_features_batch
 from app.ml_extract import extract_features_for_preview
 
 router = APIRouter(prefix="/api/tasks", tags=["Tasks"])
@@ -144,6 +145,8 @@ def list_tasks(
                 "member_task_note": a.member_task_note,
                 "latest_evidence_name": a.latest_evidence_name,
                 "latest_evidence_url": a.latest_evidence_url,
+                "member_evidence_status": a.member_evidence_status,
+                "review_feedback": a.review_feedback,
                 "progress_pct": a.progress_pct,
                 "status": a.status,
                 "is_late": a.is_late,
@@ -204,6 +207,11 @@ def list_tasks(
             "pending_extensions": sum(1 for e in t.extensions if e.status == EXT_PENDING),
             "assignees": assignees
         })
+    # Ưu tiên đưa các công việc đang thực hiện / việc nhóm lên trên cùng để dễ theo dõi và thao tác
+    res.sort(key=lambda item: (
+        0 if (item["status"] != ST_DONE and item["assignment_mode"] == "Group") else (1 if item["status"] != ST_DONE else 2),
+        -item["id"]
+    ))
     return res
 
 
@@ -214,10 +222,17 @@ def preview_task_risk(
     user: User = Depends(current_user)
 ):
     """
-    Xem trước dự đoán rủi ro trễ hạn ML và xếp hạng giảng viên phù hợp trước khi giao việc (FR-10, UC-01 Bước 4-6).
+    Xem trước dự đoán rủi ro trễ hạn ML & Gợi ý tối ưu:
+    1. Chỉ đề xuất giảng viên có năng lực/kinh nghiệm thuộc Nhóm công việc được chọn (task_group).
+    2. Lọc ưu tiên các giảng viên có độ trễ dự báo thấp nhất.
+    3. Tự động gợi ý Ứng viên làm Người Phụ trách chính (Trưởng nhóm) kèm bộ 4 tiêu chí/điều kiện xét chọn rõ ràng.
     """
     if req.original_deadline <= date.today():
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Thời hạn hoàn thành phải sau ngày giao ít nhất 1 ngày")
+
+    tt = db.get(TaskType, req.task_type_id)
+    selected_group = tt.task_group if tt else "Chuyên môn Khoa"
+    selected_type_name = tt.name if tt else "Công việc chuyên môn"
 
     if req.lecturer_ids and len(req.lecturer_ids) > 0:
         lecturers = db.query(User).filter(User.id.in_(req.lecturer_ids), User.is_active == True).all()
@@ -228,8 +243,33 @@ def preview_task_risk(
         lecturers = q.all()
 
     team_size = len(req.lecturer_ids) if req.lecturer_ids and len(req.lecturer_ids) > 1 else 1
-    candidates = []
+    raw_candidates = []
+    lec_contexts = []
+
     for lec in lecturers:
+        # Tính số việc đã hoàn thành thuộc đúng Nhóm công việc (task_group) được chọn
+        group_assigns = (
+            db.query(TaskAssignment)
+            .join(Task)
+            .join(TaskType, Task.task_type_id == TaskType.id)
+            .filter(
+                TaskAssignment.lecturer_id == lec.id,
+                TaskType.task_group == selected_group,
+                TaskAssignment.status == ST_DONE
+            )
+            .all()
+        )
+        group_done_cnt = len(group_assigns)
+        group_late_cnt = sum(1 for ga in group_assigns if ga.is_late)
+        group_on_time_rate = round((group_done_cnt - group_late_cnt) / group_done_cnt * 100, 1) if group_done_cnt > 0 else 100.0
+
+        # Số lần từng làm Trưởng nhóm (Phụ trách chính)
+        lead_exp_cnt = (
+            db.query(TaskAssignment)
+            .filter(TaskAssignment.lecturer_id == lec.id, TaskAssignment.is_lead == True)
+            .count()
+        )
+
         feats = extract_features_for_preview(
             db=db,
             task_type_id=req.task_type_id,
@@ -246,42 +286,143 @@ def preview_task_risk(
             assignment_level=req.assignment_level or "Khoa",
             assignment_channel=req.assignment_channel or "Hệ thống"
         )
-        pred = preview_risk_for_features(feats)
-        candidates.append({
+        lec_contexts.append((lec, group_done_cnt, group_on_time_rate, lead_exp_cnt, feats))
+
+    batch_preds = preview_risk_for_features_batch([ctx[4] for ctx in lec_contexts])
+
+    for (lec, group_done_cnt, group_on_time_rate, lead_exp_cnt, feats), pred in zip(lec_contexts, batch_preds):
+        prob = float(pred.get("probability") if pred.get("probability") is not None else 0.18)
+        open_tasks = int(feats.get("active_tasks") or 0)
+        overdue_tasks = int(feats.get("overdue_open_tasks") or 0)
+        hist_completed = int(feats.get("hist_count") or 0)
+        hist_late_rate = round(float(feats.get("hist_late_rate") or 0.0) * 100, 1)
+        mat_type_cnt = int(feats.get("lecturer_task_count") or 0)
+        degree_str = lec.profile.degree if lec.profile else "Thạc sĩ"
+        rank_str = lec.profile.academic_rank if lec.profile else "Giảng viên"
+
+        # --- ĐÁNH GIÁ 4 ĐIỀU KIỆN ĐỂ GỢI Ý NGƯỜI PHỤ TRÁCH CHÍNH (TRƯỞNG NHÓM) ---
+        cond1_pass = prob < 0.23
+        cond2_pass = (group_done_cnt >= 1 or mat_type_cnt >= 1) and group_on_time_rate >= 80.0
+        cond3_pass = ("Tiến sĩ" in degree_str) or ("PGS" in degree_str) or ("chính" in rank_str.lower()) or (hist_completed >= 8)
+        cond4_pass = (overdue_tasks == 0) and (open_tasks <= 3)
+
+        lead_score = 0
+        lead_score += max(0, int((1.0 - min(prob, 0.8)) * 40))  # Tối đa 40đ từ độ trễ thấp
+        lead_score += min(25, group_done_cnt * 6 + mat_type_cnt * 5) if group_on_time_rate >= 80 else 8
+        lead_score += 20 if ("Tiến sĩ" in degree_str or "PGS" in degree_str or "chính" in rank_str.lower()) else 12
+        lead_score += 15 if cond4_pass else (5 if overdue_tasks == 0 else 0)
+        lead_score = min(99, lead_score)
+
+        lead_conditions = [
+            {
+                "code": "LOW_DELAY_RISK",
+                "title": "1. Độ trễ dự báo ở mức Thấp (< 23%)",
+                "criterion": "1. Nguy cơ trễ hạn dự báo thấp nhất (ML Risk)",
+                "passed": cond1_pass,
+                "detail": f"Xác suất trễ hạn dự báo chỉ {(prob * 100):.1f}% (Mức {pred.get('level', 'Thấp')})"
+            },
+            {
+                "code": "GROUP_EXPERTISE",
+                "title": f"2. Sở trường nhóm việc '{selected_group}'",
+                "criterion": f"2. Kinh nghiệm thực hiện trong Nhóm công việc '{selected_group}'",
+                "passed": cond2_pass,
+                "detail": f"Đã hoàn thành {max(group_done_cnt, mat_type_cnt)} việc thuộc nhóm này (Đúng hạn {group_on_time_rate}%)"
+            },
+            {
+                "code": "LEADERSHIP_QUALIFICATION",
+                "title": "3. Năng lực học thuật & Kinh nghiệm chủ trì",
+                "criterion": "3. Học vị chuyên môn & Kinh nghiệm chủ trì",
+                "passed": cond3_pass,
+                "detail": f"{degree_str} • {rank_str} • Đã hoàn thành {hist_completed} việc lịch sử ({lead_exp_cnt} lần chủ trì)"
+            },
+            {
+                "code": "WORKLOAD_AVAILABILITY",
+                "title": "4. Quỹ thời gian sẵn sàng điều phối nhóm",
+                "criterion": "4. Tải công việc hiện tại không quá tải & 0 việc quá hạn",
+                "passed": cond4_pass,
+                "detail": f"Đang mở {open_tasks} việc • Quá hạn: {overdue_tasks} việc"
+            }
+        ]
+
+        raw_candidates.append({
             "lecturer_id": lec.id,
             "full_name": lec.full_name,
             "lecturer_code": lec.profile.lecturer_code if lec.profile else f"GV{lec.id:04d}",
             "department_name": lec.department.name if lec.department else "",
-            "academic_rank": lec.profile.academic_rank if lec.profile else "Giảng viên",
-            "degree": lec.profile.degree if lec.profile else "Thạc sĩ",
+            "academic_rank": rank_str,
+            "degree": degree_str,
             "teaching_hours_semester": lec.profile.teaching_hours_semester if lec.profile else 0.0,
-            "current_open_tasks": int(feats.get("active_tasks") or 0),
-            "current_overdue_tasks": int(feats.get("overdue_open_tasks") or 0),
-            "hist_completed_count": int(feats.get("hist_count") or 0),
-            "hist_late_rate": round(float(feats.get("hist_late_rate") or 0.0) * 100, 1),
-            "mat_type_count": int(feats.get("lecturer_task_count") or 0),
+            "current_open_tasks": open_tasks,
+            "current_overdue_tasks": overdue_tasks,
+            "hist_completed_count": hist_completed,
+            "hist_late_rate": hist_late_rate,
+            "mat_type_count": mat_type_cnt,
             "mat_type_late_rate": round(float(feats.get("lecturer_task_late_rate") or 0.0) * 100, 1),
+            "task_group_match": selected_group,
+            "group_done_count": max(group_done_cnt, mat_type_cnt),
+            "group_completed_count": max(group_done_cnt, mat_type_cnt),
+            "group_on_time_rate": group_on_time_rate,
+            "in_selected_group": (group_done_cnt > 0 or mat_type_cnt > 0),
             "lead_time_days": int(feats.get("available_days") or 0),
             "expected_duration_days": round(float(feats.get("expected_duration_days") or 7.0), 1),
             "lead_vs_expected_ratio": round(float(feats.get("deadline_pressure") or 1.0), 2),
             "status": pred.get("status", "ok"),
-            "probability": pred.get("probability"),
+            "probability": prob,
             "level": pred.get("level"),
             "uncertainty": pred.get("uncertainty"),
             "top_factors": pred.get("top_factors", []),
             "recommendation": pred.get("recommendation"),
             "low_confidence": pred.get("low_confidence", False),
-            "latency_ms": pred.get("latency_ms", 0)
+            "latency_ms": pred.get("latency_ms", 0),
+            "lead_score": lead_score,
+            "lead_conditions_passed": sum(1 for c in lead_conditions if c["passed"]),
+            "lead_conditions": lead_conditions,
+            "conditions": lead_conditions,
+            "is_recommended_lead": False,
         })
 
-    # Xếp hạng giảng viên từ xác suất rủi ro thấp nhất -> cao nhất (tối ưu phân công)
-    candidates.sort(key=lambda c: (c["probability"] if c["probability"] is not None else 9.9, c["current_open_tasks"]))
-    for idx, c in enumerate(candidates):
+    # 1. Lọc giảng viên thuộc nhóm công việc được chọn (có kinh nghiệm nhóm việc đó)
+    group_matched = [c for c in raw_candidates if c["in_selected_group"]]
+    pool = group_matched if len(group_matched) >= 2 else raw_candidates
+
+    # 2. Sắp xếp từ độ trễ dự báo thấp nhất -> cao nhất
+    pool.sort(key=lambda c: (c["probability"], c["current_open_tasks"], -c["lead_score"]))
+
+    # 3. Chỉ lọc ra các giảng viên có độ trễ thấp nhất (Mức Thấp hoặc Top 5 người độ trễ thấp nhất trong nhóm việc)
+    low_risk_only = [c for c in pool if c["probability"] < 0.30]
+    final_candidates = low_risk_only[:6] if len(low_risk_only) >= 2 else pool[:5]
+
+    for idx, c in enumerate(final_candidates):
         c["rank"] = idx + 1
 
+    # 4. Chọn Người Phụ trách chính được đề xuất tốt nhất (điểm lead_score cao nhất trong nhóm độ trễ thấp)
+    recommended_lead = None
+    if final_candidates:
+        best_lead = max(final_candidates, key=lambda c: (c["lead_conditions_passed"], c["lead_score"], -c["probability"]))
+        best_lead["is_recommended_lead"] = True
+        best_lead["reason_summary"] = (
+            f"Đạt điểm tiêu chí Phụ trách chính cao nhất ({best_lead['lead_score']}/100): "
+            f"độ trễ dự báo thấp ({(best_lead['probability'] * 100):.1f}%), "
+            f"đã hoàn thành {best_lead['group_done_count']} việc thuộc nhóm '{selected_group}' "
+            f"và đang mở {best_lead['current_open_tasks']} việc ({best_lead['current_overdue_tasks']} việc quá hạn)."
+        )
+        recommended_lead = best_lead
+
+    lead_criteria_rules = [
+        "1. Độ trễ dự báo thấp nhất: Xác suất trễ hạn ML đạt ngưỡng an toàn (< 23%).",
+        f"2. Đúng nhóm chuyên môn: Có lịch sử hoàn thành tốt các đầu việc thuộc nhóm '{selected_group}' (tỷ lệ đúng hạn ≥ 80%).",
+        "3. Năng lực chủ trì & Học thuật: Ưu tiên Tiến sĩ / PGS / Giảng viên chính hoặc có kinh nghiệm chủ trì nhiều đầu việc.",
+        "4. Quỹ thời gian khả dụng: Không có công việc đang quá hạn (0 việc quá hạn) và tải hiện tại ≤ 3 việc."
+    ]
+
     return {
-        "candidates": candidates,
-        "thresholds": {"low": 0.22, "high": 0.44},
+        "selected_task_group": selected_group,
+        "selected_task_type_name": selected_type_name,
+        "total_evaluated": len(raw_candidates),
+        "candidates": final_candidates,
+        "recommended_lead": recommended_lead,
+        "lead_criteria_rules": lead_criteria_rules,
+        "thresholds": {"low": 0.23, "high": 0.52},
         "evaluated_at": datetime.now()
     }
 
@@ -385,6 +526,8 @@ def get_task_detail(task_id: int, db: Session = Depends(get_db), user: User = De
             "status": a.status,
             "latest_evidence_name": a.latest_evidence_name,
             "latest_evidence_url": a.latest_evidence_url,
+            "member_evidence_status": a.member_evidence_status,
+            "review_feedback": a.review_feedback,
             "completed_at": a.completed_at,
             "is_late": a.is_late,
             "delay_days": a.delay_days
@@ -586,7 +729,7 @@ def delegate_group_task(
 ):
     """
     Cho phép Người phụ trách chính của nhóm (hoặc Quản lý / Người kiểm tra) phân chia đầu việc cụ thể
-    hoặc giao thêm việc cho các thành viên khác trong nhóm.
+    cho các thành viên hiện có trong nhóm (không thêm người ngoài nhóm).
     """
     task = db.get(Task, task_id)
     if not task:
@@ -603,71 +746,169 @@ def delegate_group_task(
     if not (is_lead_user or is_reviewer_or_mgr):
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
-            "Chỉ Người phụ trách chính của nhóm hoặc Người quản lý/kiểm tra mới có quyền phân chia công việc cho các thành viên."
+            "Chỉ Người phụ trách chính của nhóm hoặc Người quản lý/kiểm tra mới có quyền phân chia nhiệm vụ cho các thành viên."
         )
 
     existing_map = {a.lecturer_id: a for a in task.assignments}
-    added_count = 0
     updated_count = 0
 
     for item in req.members:
-        if item.lecturer_id in existing_map:
-            assign = existing_map[item.lecturer_id]
-            if assign.member_task_note != item.member_task_note:
-                assign.member_task_note = item.member_task_note
-                updated_count += 1
-                if item.lecturer_id != user.id and item.member_task_note:
-                    db.add(Notification(
-                        user_id=item.lecturer_id,
-                        kind="new_task",
-                        title=f"Phân công nhiệm vụ nhóm: {task.title}",
-                        content=f"Người phụ trách ({user.full_name}) đã giao nhiệm vụ chi tiết cho bạn trong '{task.title}': {item.member_task_note}",
-                        task_id=task.id,
-                        dedupe_key=f"delegate_upd:{task.id}:{item.lecturer_id}:{uuid.uuid4().hex[:6]}"
-                    ))
-        else:
-            # Thêm thành viên mới vào nhóm
-            new_assign = TaskAssignment(
-                task_id=task.id,
-                lecturer_id=item.lecturer_id,
-                is_lead=False,
-                member_task_note=item.member_task_note,
-                progress_pct=0,
-                status=ST_NEW
+        if item.lecturer_id not in existing_map:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                "Không được phép thêm giảng viên ngoài nhóm vào phân công nhiệm vụ nhóm."
             )
-            db.add(new_assign)
-            db.flush()
-            added_count += 1
+        assign = existing_map[item.lecturer_id]
+        new_note = (item.member_task_note or "").strip()
+        if assign.member_task_note != new_note:
+            assign.member_task_note = new_note
+            updated_count += 1
+            if item.lecturer_id != user.id and new_note:
+                db.add(Notification(
+                    user_id=item.lecturer_id,
+                    kind="new_task",
+                    title=f"Phân công nhiệm vụ nhóm [{task.code}]: {task.title}",
+                    content=f"Người phụ trách ({user.full_name}) đã giao nhiệm vụ chi tiết cho bạn trong '{task.title}': {new_note}",
+                    task_id=task.id,
+                    dedupe_key=f"delegate_upd:{task.id}:{item.lecturer_id}:{uuid.uuid4().hex[:6]}"
+                ))
 
-            db.add(Notification(
-                user_id=item.lecturer_id,
-                kind="new_task",
-                title=f"Được giao việc vào nhóm: {task.title}",
-                content=(
-                    f"{user.full_name} đã phân công bạn tham gia nhóm công việc '{task.title}'. "
-                    f"Nhiệm vụ: {item.member_task_note or 'Phối hợp thực hiện theo kế hoạch nhóm'}. Hạn chót: {task.current_deadline}."
-                ),
-                task_id=task.id,
-                dedupe_key=f"delegate_new:{task.id}:{item.lecturer_id}"
-            ))
-            predict_and_record_risk(db, task.id, new_assign.id, item.lecturer_id, trigger="assign")
-
-    # Cập nhật lại chế độ nhóm và người phụ trách chính nếu có thay đổi
     db.flush()
     all_assigns = db.query(TaskAssignment).filter_by(task_id=task.id).all()
-    if len(all_assigns) > 1:
-        task.assignment_mode = "Group"
-
-    if req.lead_lecturer_id:
+    if req.lead_lecturer_id and req.lead_lecturer_id in existing_map:
         task.lead_lecturer_id = req.lead_lecturer_id
         for a in all_assigns:
             a.is_lead = (a.lecturer_id == req.lead_lecturer_id)
 
     db.commit()
     return {
-        "message": f"Đã cập nhật phân công nhóm thành công (thêm mới {added_count} thành viên, cập nhật {updated_count} nhiệm vụ).",
-        "added_count": added_count,
+        "message": f"Đã lưu phân công nhiệm vụ cho các thành viên nhóm '{task.code}' thành công ({updated_count} nhiệm vụ được cập nhật).",
         "updated_count": updated_count
+    }
+
+
+@router.post("/{task_id}/member-evidence")
+def submit_member_evidence(
+    task_id: int,
+    req: MemberEvidenceSubmitRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user)
+):
+    """
+    Thành viên trong nhóm gửi file minh chứng phần việc của mình lên cho Trưởng nhóm (Người phụ trách chính) kiểm tra trước.
+    """
+    task = db.get(Task, task_id)
+    if not task:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Không tìm thấy công việc")
+
+    assign = db.query(TaskAssignment).filter_by(task_id=task_id, lecturer_id=user.id).first()
+    if not assign:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Chỉ giảng viên là thành viên của nhóm mới được gửi minh chứng phần việc của mình.")
+
+    now = datetime.now()
+    assign.latest_evidence_name = req.evidence_file_name
+    assign.latest_evidence_url = req.evidence_file_url
+    assign.member_evidence_status = "Đã gửi Trưởng nhóm"
+    if assign.status == ST_NEW:
+        assign.status = ST_DOING
+        task.status = ST_DOING
+
+    prog = ProgressUpdate(
+        assignment_id=assign.id,
+        progress_pct=assign.progress_pct,
+        note=f"[Gửi Trưởng nhóm duyệt] {req.note}",
+        evidence_file_name=req.evidence_file_name,
+        evidence_file_url=req.evidence_file_url,
+        created_by=user.id,
+        created_at=now
+    )
+    db.add(prog)
+
+    # Thông báo cho Trưởng nhóm (Người phụ trách chính)
+    lead_id = task.lead_lecturer_id
+    if not lead_id:
+        lead_assign = next((a for a in task.assignments if a.is_lead), None)
+        lead_id = lead_assign.lecturer_id if lead_assign else None
+
+    if lead_id and lead_id != user.id:
+        db.add(Notification(
+            user_id=lead_id,
+            kind="new_task",
+            title=f"Minh chứng thành viên nhóm [{task.code}]: {user.full_name}",
+            content=f"Thành viên {user.full_name} đã nộp file minh chứng '{req.evidence_file_name}' lên Trưởng nhóm cho công việc '{task.title}'. Ghi chú: {req.note}",
+            task_id=task.id,
+            dedupe_key=f"mem_ev:{task.id}:{user.id}:{uuid.uuid4().hex[:6]}"
+        ))
+
+    db.commit()
+    return {
+        "message": f"Đã gửi file minh chứng '{req.evidence_file_name}' lên Người phụ trách chính (Trưởng nhóm) để kiểm tra và cập nhật tiến độ!",
+        "evidence_file_name": assign.latest_evidence_name,
+        "member_evidence_status": assign.member_evidence_status
+    }
+
+
+@router.post("/{task_id}/feedback")
+def send_task_feedback(
+    task_id: int,
+    req: TaskFeedbackRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user)
+):
+    """
+    Người phụ trách chính (Trưởng nhóm) hoặc Người kiểm tra / Quản lý gửi thông báo nhắc nhở thiếu sót
+    để thành viên / nhóm kịp thời bổ sung hoàn thiện.
+    """
+    task = db.get(Task, task_id)
+    if not task:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Không tìm thấy công việc")
+
+    is_lead_user = (task.lead_lecturer_id == user.id) or any(
+        a.lecturer_id == user.id and a.is_lead for a in task.assignments
+    )
+    is_reviewer_or_mgr = (
+        user.role in (ROLE_MANAGER, ROLE_ADMIN)
+        or task.reviewer_id == user.id
+        or task.created_by == user.id
+    )
+    if not (is_lead_user or is_reviewer_or_mgr):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Chỉ Người phụ trách chính hoặc Người kiểm tra / Quản lý mới có quyền gửi thông báo rà soát thiếu sót."
+        )
+
+    sender_role = "Người phụ trách chính" if is_lead_user and user.role == ROLE_LECTURER else "Người kiểm tra / Quản lý"
+    targets = []
+    if req.lecturer_id:
+        t_assign = db.query(TaskAssignment).filter_by(task_id=task_id, lecturer_id=req.lecturer_id).first()
+        if t_assign:
+            targets.append(t_assign)
+    else:
+        targets = list(task.assignments)
+
+    if not targets:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Không tìm thấy thành viên nhận thông báo")
+
+    status_val = req.mark_status or req.status_action or "Cần bổ sung"
+    for a in targets:
+        a.review_feedback = f"[{sender_role} - {user.full_name}]: {req.feedback}"
+        if status_val:
+            a.member_evidence_status = status_val
+        if req.progress_pct is not None:
+            a.progress_pct = req.progress_pct
+        if a.lecturer_id != user.id:
+            db.add(Notification(
+                user_id=a.lecturer_id,
+                kind="overdue" if status_val == "Cần bổ sung" else "new_task",
+                title=f"Yêu cầu bổ sung / Rà soát [{task.code}]: {task.title}",
+                content=f"{sender_role} ({user.full_name}) thông báo về phần việc trong '{task.title}': {req.feedback}. Vui lòng kiểm tra và kịp thời hoàn thiện.",
+                task_id=task.id,
+                dedupe_key=f"fb:{task.id}:{a.lecturer_id}:{uuid.uuid4().hex[:6]}"
+            ))
+
+    db.commit()
+    return {
+        "message": f"Đã gửi thông báo rà soát / nhắc nhở thiếu sót tới {len(targets)} thành viên trong công việc '{task.code}'."
     }
 
 
@@ -678,39 +919,110 @@ def update_progress(
     db: Session = Depends(get_db),
     user: User = Depends(current_user)
 ):
-    """Cập nhật tiến độ hoàn thành theo % kèm file minh chứng (FR-04)."""
+    """
+    Quy tắc phân quyền chuẩn:
+    1. Nộp file minh chứng chính thức:
+       - Quản lý (manager / admin) hoặc Người kiểm tra (reviewer) KHÔNG thuộc nhóm thực hiện: KHÔNG được nộp thay file minh chứng của tài khoản khác!
+       - Công việc nhóm (Group): Chỉ Trưởng nhóm (Người phụ trách chính) mới được nộp file minh chứng tổng hợp của nhóm lên Người kiểm tra.
+         Nếu thành viên thường gửi file minh chứng thì tự động chuyển về trạng thái 'Đã gửi Trưởng nhóm' chờ Trưởng nhóm duyệt.
+    2. Cập nhật thanh tiến độ (%):
+       - Do Người kiểm tra (reviewer / manager) hoặc Người phụ trách chính (Trưởng nhóm) cập nhật cho từng thành viên nhóm (hoặc giảng viên tự cập nhật nếu là việc cá nhân 1 người).
+    """
     task = db.get(Task, task_id)
     if not task:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Không tìm thấy công việc")
 
+    is_group = (task.assignment_mode == "Group") or (len(task.assignments) >= 2)
+    my_assign = db.query(TaskAssignment).filter_by(task_id=task_id, lecturer_id=user.id).first()
+    is_user_lead = bool(
+        (task.lead_lecturer_id == user.id)
+        or (my_assign and my_assign.is_lead)
+        or (not is_group and my_assign is not None)
+    )
+    is_reviewer_or_mgr = (
+        user.role in (ROLE_MANAGER, ROLE_ADMIN)
+        or task.reviewer_id == user.id
+        or task.created_by == user.id
+    )
+
     target_lecturer_id = req.lecturer_id or user.id
     assign = db.query(TaskAssignment).filter_by(task_id=task_id, lecturer_id=target_lecturer_id).first()
 
+    if not assign and (is_reviewer_or_mgr or is_user_lead):
+        assign = (
+            db.query(TaskAssignment).filter_by(task_id=task_id, is_lead=True).first()
+            or db.query(TaskAssignment).filter_by(task_id=task_id).first()
+        )
+
     if not assign:
-        # Nếu quản lý/người kiểm tra/trưởng nhóm cập nhật mà không truyền lecturer_id thì lấy dòng của trưởng nhóm hoặc dòng đầu tiên
-        if user.role in (ROLE_MANAGER, ROLE_ADMIN) or task.reviewer_id == user.id or task.lead_lecturer_id == user.id:
-            assign = (
-                db.query(TaskAssignment).filter_by(task_id=task_id, is_lead=True).first()
-                or db.query(TaskAssignment).filter_by(task_id=task_id).first()
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Bạn không tham gia hoặc không có quyền trên công việc này")
+
+    # KIỂM TRA QUYỀN NỘP MINH CHỨNG:
+    # Quản lý / Admin / Người kiểm tra (không phải người phụ trách chính) không được phép gửi minh chứng thay cho tài khoản khác
+    is_uploading_new_evidence = bool(req.evidence_file_url and req.evidence_file_url != assign.latest_evidence_url)
+    if is_uploading_new_evidence:
+        if my_assign is None:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "Tài khoản Quản lý / Người kiểm tra không được nộp thay file minh chứng của giảng viên khác. Chỉ Trưởng nhóm (Người phụ trách chính) mới có quyền nộp minh chứng!"
             )
+        if is_group and not is_user_lead:
+            # Nếu là thành viên thường trong nhóm nộp minh chứng -> Gửi lên Trưởng nhóm trước!
+            now = datetime.now()
+            my_assign.latest_evidence_name = req.evidence_file_name or "File minh chứng thành viên"
+            my_assign.latest_evidence_url = req.evidence_file_url
+            my_assign.member_evidence_status = "Đã gửi Trưởng nhóm"
+            if my_assign.status == ST_NEW:
+                my_assign.status = ST_DOING
+                task.status = ST_DOING
+            prog = ProgressUpdate(
+                assignment_id=my_assign.id,
+                progress_pct=my_assign.progress_pct,
+                note=f"[Gửi Trưởng nhóm duyệt] {req.note or 'Nộp minh chứng phần việc thành viên'}",
+                evidence_file_name=my_assign.latest_evidence_name,
+                evidence_file_url=my_assign.latest_evidence_url,
+                created_by=user.id,
+                created_at=now
+            )
+            db.add(prog)
+            if task.lead_lecturer_id and task.lead_lecturer_id != user.id:
+                db.add(Notification(
+                    user_id=task.lead_lecturer_id,
+                    kind="new_task",
+                    title=f"Minh chứng thành viên [{task.code}]: {user.full_name}",
+                    content=f"Thành viên {user.full_name} vừa gửi minh chứng '{my_assign.latest_evidence_name}' lên Trưởng nhóm duyệt.",
+                    task_id=task.id,
+                    dedupe_key=f"mem_ev2:{task.id}:{user.id}:{uuid.uuid4().hex[:6]}"
+                ))
+            db.commit()
+            return {
+                "message": "Đã gửi file minh chứng lên Trưởng nhóm (Người phụ trách chính) xem xét trước khi cập nhật tiến độ!",
+                "progress_pct": my_assign.progress_pct,
+                "status": my_assign.status,
+                "evidence_file_name": my_assign.latest_evidence_name,
+                "evidence_file_url": my_assign.latest_evidence_url,
+                "member_evidence_status": my_assign.member_evidence_status
+            }
 
-    if not assign:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Bạn không phụ trách công việc này")
-
-    can_edit = (
-        assign.lecturer_id == user.id
-        or task.lead_lecturer_id == user.id
-        or task.reviewer_id == user.id
-        or task.created_by == user.id
-        or user.role in (ROLE_MANAGER, ROLE_ADMIN)
-    )
-    if not can_edit:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Bạn không có quyền cập nhật tiến độ cho phân công này")
+    # KIỂM TRA QUYỀN CẬP NHẬT TIẾN ĐỘ (%):
+    # Trong công việc nhóm, chỉ Người kiểm tra / Quản lý hoặc Người phụ trách chính (Trưởng nhóm) mới được cập nhật % tiến độ
+    if is_group and not (is_user_lead or is_reviewer_or_mgr):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Trong công việc nhóm, thành viên gửi minh chứng lên Trưởng nhóm trước. Chỉ Trưởng nhóm (Phụ trách chính) hoặc Người kiểm tra mới có quyền cập nhật % tiến độ!"
+        )
 
     assign.progress_pct = req.progress_pct
-    if req.evidence_file_url:
-        assign.latest_evidence_name = req.evidence_file_name or "File minh chứng"
-        assign.latest_evidence_url = req.evidence_file_url
+    if req.evidence_file_url and is_user_lead:
+        # Trưởng nhóm nộp minh chứng tổng của nhóm (hoặc cá nhân nộp minh chứng việc cá nhân)
+        lead_assign = db.query(TaskAssignment).filter_by(task_id=task_id, lecturer_id=user.id).first() or assign
+        lead_assign.latest_evidence_name = req.evidence_file_name or "File minh chứng"
+        lead_assign.latest_evidence_url = req.evidence_file_url
+        lead_assign.member_evidence_status = "Minh chứng chính thức của Nhóm" if is_group else "Đã nộp minh chứng"
+
+    if (is_user_lead or is_reviewer_or_mgr) and assign.latest_evidence_url:
+        if assign.member_evidence_status == "Đã gửi Trưởng nhóm":
+            assign.member_evidence_status = "Đã xác nhận"
 
     if assign.progress_pct > 0 and assign.status == ST_NEW:
         assign.status = ST_DOING
@@ -737,19 +1049,32 @@ def update_progress(
         assignment_id=assign.id,
         progress_pct=req.progress_pct,
         note=req.note,
-        evidence_file_name=req.evidence_file_name,
-        evidence_file_url=req.evidence_file_url,
+        evidence_file_name=req.evidence_file_name if is_user_lead else None,
+        evidence_file_url=req.evidence_file_url if is_user_lead else None,
         created_by=user.id,
         created_at=now
     )
     db.add(prog)
+
+    # Nếu Người kiểm tra hoặc Trưởng nhóm cập nhật tiến độ kèm ghi chú nhắc nhở cho thành viên thì gửi thông báo
+    if assign.lecturer_id != user.id and req.note:
+        db.add(Notification(
+            user_id=assign.lecturer_id,
+            kind="new_task",
+            title=f"Cập nhật tiến độ [{task.code}] ({req.progress_pct}%)",
+            content=f"{user.full_name} đã cập nhật tiến độ phần việc của bạn trong '{task.title}' lên {req.progress_pct}%. Nhận xét: {req.note}",
+            task_id=task.id,
+            dedupe_key=f"prog_upd:{task.id}:{assign.lecturer_id}:{uuid.uuid4().hex[:6]}"
+        ))
+
     db.commit()
     return {
-        "message": "Cập nhật tiến độ thành công",
+        "message": f"Đã cập nhật tiến độ cho {assign.lecturer.full_name} đạt {assign.progress_pct}%",
         "progress_pct": assign.progress_pct,
         "status": assign.status,
         "evidence_file_name": assign.latest_evidence_name,
-        "evidence_file_url": assign.latest_evidence_url
+        "evidence_file_url": assign.latest_evidence_url,
+        "member_evidence_status": assign.member_evidence_status
     }
 
 

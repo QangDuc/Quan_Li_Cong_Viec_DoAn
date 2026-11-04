@@ -77,30 +77,460 @@ def list_plans(
     return res
 
 
+def _parse_plan_rows_from_ws(ws, db: Session):
+    """Đọc linh hoạt cả biểu mẫu Kế hoạch Năm chính thức (16 cột, có Quốc hiệu/Tiêu đề Khoa) và biểu mẫu 5 cột rút gọn."""
+    all_tts = db.query(TaskType).all()
+    task_types_by_name = {tt.name.lower().strip(): tt for tt in all_tts}
+    default_tt = all_tts[0] if all_tts else None
+
+    all_scales = {
+        (tts.task_type_id, tts.scale): (tts.conversion_hours or 0.0)
+        for tts in db.query(TaskTypeScale).all()
+    }
+    school_items = {sci.code.upper().strip(): sci for sci in db.query(SchoolCatalogItem).all()}
+
+    header_row_idx = 1
+    mode = "5col"
+    for r_idx in range(1, min(12, ws.max_row + 1)):
+        vals = [str(ws.cell(row=r_idx, column=c).value or "").strip().lower() for c in range(1, min(30, ws.max_column + 1))]
+        if len(vals) >= 20 and "mã công việc" in vals[1] and "tên công việc" in vals[2]:
+            header_row_idx = r_idx
+            mode = "28col"
+            break
+        if len(vals) >= 4 and ("tên công việc" in vals[3] or "nhiệm vụ kế hoạch" in vals[3]):
+            header_row_idx = r_idx
+            mode = "16col"
+            break
+        if len(vals) >= 2 and "tên công việc" in vals[0]:
+            header_row_idx = r_idx
+            mode = "5col"
+            break
+
+    def _parse_date(val, row_idx, errors_list):
+        if isinstance(val, datetime):
+            return val.date().isoformat()
+        if isinstance(val, date):
+            return val.isoformat()
+        if val:
+            s = str(val).strip()[:10]
+            try:
+                return date.fromisoformat(s).isoformat()
+            except Exception:
+                for fmt in ("%d/%m/%Y", "%Y/%m/%d"):
+                    try:
+                        return datetime.strptime(s, fmt).date().isoformat()
+                    except Exception:
+                        pass
+                errors_list.append(f"Dòng {row_idx}: Ngày '{val}' không đúng định dạng YYYY-MM-DD")
+        return (date.today() + timedelta(days=30)).isoformat()
+
+    rows = []
+    errors = []
+    for idx, row in enumerate(ws.iter_rows(min_row=header_row_idx + 1, values_only=True), start=header_row_idx + 1):
+        if not row:
+            continue
+        if mode == "28col":
+            first_cell = str(row[0] or "").strip().upper()
+            title_cell = str(row[2] or "").strip()
+            if not title_cell or first_cell.startswith("TỔNG") or title_cell.upper().startswith("TỔNG"):
+                continue
+            plan_code = str(row[1] or f"KH-{idx-header_row_idx:03d}").strip()
+            title = title_cell
+            raw_type = str(row[3] or "").strip()
+            raw_group = str(row[4] or "").strip()
+            scale = str(row[5] or "quy mô chuẩn").strip().lower()
+            priority = str(row[6] or "Trung bình").strip()
+            complexity = str(row[7] or "Trung bình").strip()
+            raw_school = str(row[8] or "").strip()
+            role_mode = str(row[13] or "Cá nhân").strip()
+            deliverable = str(row[14] or "Báo cáo / Hồ sơ minh chứng hoàn thành").strip()
+            reviewer_str = str(row[15] or "Trưởng Bộ môn / Trưởng Khoa").strip()
+            raw_sem = str(row[16] or "").strip().upper()
+            start_date_str = _parse_date(row[17] if len(row) > 17 else None, idx, [])
+            deadline_str = _parse_date(row[18] if len(row) > 18 else None, idx, errors)
+            raw_hours = row[25] if len(row) > 25 else None
+        elif mode == "16col":
+            first_cell = str(row[0] or "").strip().upper()
+            title_cell = str(row[3] or "").strip()
+            if not title_cell or first_cell.startswith("TỔNG") or title_cell.upper().startswith("TỔNG"):
+                continue
+            plan_code = str(row[1] or f"KH-{idx-header_row_idx:03d}").strip()
+            raw_sem = str(row[2] or "").strip().upper()
+            title = title_cell
+            raw_type = str(row[4] or "").strip()
+            raw_group = str(row[5] or "").strip()
+            scale = str(row[6] or "quy mô chuẩn").strip().lower()
+            priority = str(row[7] or "Trung bình").strip()
+            complexity = str(row[8] or "Trung bình").strip()
+            start_date_str = _parse_date(row[9] if len(row) > 9 else None, idx, [])
+            deadline_str = _parse_date(row[10] if len(row) > 10 else None, idx, errors)
+            raw_hours = row[11] if len(row) > 11 else None
+            raw_school = str(row[12] or "").strip() if len(row) > 12 else ""
+            role_mode = str(row[13] or "Cá nhân").strip() if len(row) > 13 else "Cá nhân"
+            reviewer_str = str(row[14] or "Trưởng Bộ môn / Trưởng Khoa").strip() if len(row) > 14 else "Trưởng Bộ môn"
+            deliverable = str(row[15] or "Báo cáo / Hồ sơ minh chứng hoàn thành").strip() if len(row) > 15 else ""
+        else:
+            if not row[0]:
+                continue
+            title = str(row[0]).strip()
+            if title.upper().startswith("TỔNG"):
+                continue
+            plan_code = f"KH-{idx-header_row_idx:03d}"
+            raw_type = str(row[1] or "").strip() if len(row) > 1 else ""
+            deadline_str = _parse_date(row[2] if len(row) > 2 else None, idx, errors)
+            priority = str(row[3] or "Trung bình").strip() if len(row) > 3 else "Trung bình"
+            scale = str(row[4] or "quy mô chuẩn").strip().lower() if len(row) > 4 else "quy mô chuẩn"
+            complexity = "Trung bình"
+            raw_sem = ""
+            raw_group = ""
+            start_date_str = date.today().isoformat()
+            raw_hours = None
+            raw_school = ""
+            role_mode = "Cá nhân"
+            reviewer_str = "Trưởng Khoa / Trưởng Bộ môn"
+            deliverable = "File hồ sơ minh chứng kết quả"
+
+        matched_tt = task_types_by_name.get(raw_type.lower(), default_tt)
+        is_exact_type = raw_type.lower() in task_types_by_name
+        matched_type_name = matched_tt.name if matched_tt else "Giảng dạy học phần"
+        matched_group = matched_tt.task_group if matched_tt else (raw_group or "Giảng dạy")
+
+        if scale not in ("quy mô nhỏ", "quy mô chuẩn", "quy mô lớn"):
+            scale = "quy mô chuẩn"
+        if priority not in ("Thấp", "Trung bình", "Cao", "Khẩn cấp"):
+            priority = "Trung bình"
+        if complexity not in ("Thấp", "Trung bình", "Cao"):
+            complexity = "Trung bình"
+
+        try:
+            dl_date = date.fromisoformat(deadline_str)
+        except Exception:
+            dl_date = date.today() + timedelta(days=30)
+        sem_val = raw_sem if raw_sem in ("HK1", "HK2", "HE") else semester_of(dl_date)
+
+        # Ánh xạ mục cấp Trường nếu có mã TR-xx
+        school_code = None
+        school_id = None
+        if raw_school and raw_school.upper() != "CẤP KHOA/BỘ MÔN":
+            code_candidate = raw_school.split("-")[0].strip() + "-" + raw_school.split("-")[1].split()[0].strip() if "-" in raw_school else raw_school.strip().upper()
+            sci_obj = school_items.get(code_candidate.upper())
+            if sci_obj:
+                school_code = sci_obj.code
+                school_id = sci_obj.id
+
+        calc_hours = (
+            school_items[school_code].conversion_hours
+            if school_code and school_code in school_items
+            else all_scales.get((matched_tt.id if matched_tt else 1, scale), 10.0)
+        )
+        try:
+            conv_hours = float(raw_hours) if raw_hours is not None and str(raw_hours).strip() != "" else float(calc_hours)
+        except Exception:
+            conv_hours = float(calc_hours)
+
+        rows.append({
+            "row_number": idx,
+            "plan_code": plan_code,
+            "semester": sem_val,
+            "title": title,
+            "raw_task_type": raw_type or matched_type_name,
+            "matched_task_type": matched_type_name,
+            "task_type_id": matched_tt.id if matched_tt else 1,
+            "task_group": matched_group,
+            "is_exact_type": is_exact_type,
+            "scale": scale,
+            "priority": priority,
+            "complexity": complexity,
+            "start_date": start_date_str,
+            "deadline": deadline_str,
+            "conversion_hours": round(conv_hours, 2),
+            "school_catalog_code": school_code or "Cấp Khoa/Bộ môn",
+            "school_catalog_id": school_id,
+            "role_mode": role_mode,
+            "reviewer_name": reviewer_str,
+            "deliverable": deliverable,
+        })
+
+    return rows, errors
+
+
 @router.get("/plans/template")
-def download_plan_template():
-    """Tải file Excel mẫu Kế hoạch công việc năm (UC-05)."""
+def download_plan_template(
+    academic_year: str = "2026-2027",
+    lecturer_id: int | None = None,
+    db: Session = Depends(get_db),
+):
+    """Tải file Excel Biểu mẫu Kế hoạch Công tác Năm chính thức (16 cột + 2 Sheet chuẩn Thông tư 20/2020/TT-BGDĐT)."""
+    from openpyxl.styles import Font, PatternFill, Alignment
+
+    lec = db.get(User, lecturer_id) if lecturer_id else None
+    if not lec:
+        lec = db.query(User).filter_by(username="gv_k01_1").first() or db.query(User).filter_by(role="lecturer").first()
+
+    lec_name = lec.full_name if lec else "ThS. Nguyễn Minh Khoa"
+    lec_code = (lec.profile.lecturer_code if lec and lec.profile else "GV0101")
+    lec_deg = f"{lec.profile.degree} / {lec.profile.academic_rank}" if lec and lec.profile else "Thạc sĩ / Giảng viên"
+    lec_dept = lec.department.name if lec and lec.department else "Bộ môn Công nghệ Phần mềm"
+
     wb = openpyxl.Workbook()
     ws = wb.active
-    ws.title = "KeHoachNam_2026_2027"
-    ws.append(["Tên công việc", "Loại công việc", "Hạn chót (YYYY-MM-DD)", "Độ ưu tiên", "Quy mô"])
-    sample_rows = [
-        ["Biên soạn đề cương chi tiết học phần Học máy nâng cao", "Biên soạn đề cương học phần", "2026-11-15", "Cao", "quy mô chuẩn"],
-        ["Ra đề và chấm thi kết thúc học phần Trí tuệ nhân tạo HK1", "Ra đề và chấm thi kết thúc học phần", "2026-12-28", "Cao", "quy mô lớn"],
-        ["Viết bài báo khoa học đăng tạp chí Scopus Q2 năm học 2026-2027", "Viết bài báo quốc tế (ISI/Scopus)", "2027-03-20", "Trung bình", "quy mô chuẩn"],
-        ["Cập nhật minh chứng kiểm định chương trình đào tạo ngành CNPM", "Tự đánh giá chương trình đào tạo", "2027-04-15", "Cao", "quy mô chuẩn"],
-        ["Hướng dẫn sinh viên thực hiện khóa luận tốt nghiệp đợt 1", "Hướng dẫn khóa luận tốt nghiệp", "2027-05-30", "Trung bình", "quy mô chuẩn"],
+    ws.title = f"KeHoachNam_{academic_year.replace('-', '_')}"
+
+    # Đồng bộ 100% cấu trúc 28 cột chuẩn với Báo cáo Tổng hợp Khoa & Hồ sơ 1 Năm Giảng viên
+    headers = [
+        "STT", "Mã Công việc", "Tên Công việc", "Loại Công việc", "Nhóm việc", "Quy mô", "Mức ưu tiên", "Độ phức tạp",
+        "Danh mục Trường", "Họ và tên Giảng viên", "Mã GV", "Học vị / Chức danh", "Bộ môn", "Vai trò",
+        "Nhiệm vụ thành viên", "Người kiểm tra tiến độ", "Học kỳ", "Ngày giao", "Hạn chót gốc", "Hạn hiện tại",
+        "Tiến độ (%)", "Trạng thái", "Đánh giá hạn", "Độ lệch (ngày)", "Dự báo Rủi ro ML",
+        "Giờ chuẩn quy đổi", "Trạng thái Minh chứng", "File Minh chứng"
     ]
-    for r in sample_rows:
-        ws.append(r)
+
+    thin_border = _style_worksheet(
+        ws,
+        "TRƯỜNG ĐẠI HỌC CÔNG THƯƠNG TP.HCM (HUIT) — KHOA CÔNG NGHỆ THÔNG TIN",
+        f"BIỂU MẪU KẾ HOẠCH CÔNG TÁC & NHIỆM VỤ CHUYÊN MÔN NĂM HỌC ({academic_year})",
+        f"Giảng viên: {lec_name} ({lec_code}) | Học vị: {lec_deg} | Đơn vị: {lec_dept} | Đồng bộ chuẩn 28 cột dữ liệu toàn hệ thống",
+        headers,
+        header_color="0F766E",
+    )
+
+    y_start = int(academic_year[:4]) if academic_year[:4].isdigit() else 2026
+    y_end = y_start + 1
+
+    raw_samples = [
+        (1, f"KH-{y_start}-001", "HK1", "Biên soạn & cập nhật đề cương chi tiết học phần Học máy nâng cao", "Biên soạn đề cương học phần", "Giảng dạy", "quy mô chuẩn", "Cao", "Trung bình", "Cấp Khoa/Bộ môn", "Phụ trách chính (Trưởng nhóm)", "File PDF Đề cương chi tiết học phần có chữ ký xác nhận của Bộ môn", "Trưởng Bộ môn CNPM", f"{y_start}-09-10", f"{y_start}-10-25", 15.0, "Thấp (11.5%)"),
+        (2, f"KH-{y_start}-002", "HK1", "Xây dựng ngân hàng 120 câu hỏi trắc nghiệm & tự luận môn Trí tuệ nhân tạo", "Xây dựng ngân hàng câu hỏi thi", "Giảng dạy", "quy mô lớn", "Cao", "Cao", "Cấp Khoa/Bộ môn", "Thành viên nhóm", "Bộ ngân hàng câu hỏi + Đáp án chi tiết đóng gói nộp Tổ Khảo thí Khoa", "Trưởng Bộ môn CNPM", f"{y_start}-10-05", f"{y_start}-11-20", 20.0, "Thấp (14.2%)"),
+        (3, f"KH-{y_start}-003", "HK1", "Ra đề, coi thi và chấm thi kết thúc học phần Học máy nâng cao HK1", "Ra đề và chấm thi kết thúc học phần", "Giảng dạy", "quy mô lớn", "Khẩn cấp", "Trung bình", "Cấp Khoa/Bộ môn", "Cá nhân", "Bảng điểm tổng kết học phần + Biên bản bàn giao túi bài thi HK1", "Ban Chủ nhiệm Khoa", f"{y_start}-12-01", f"{y_start}-12-28", 12.0, "Thấp (16.0%)"),
+        (4, f"KH-{y_start}-004", "HK1", "Cố vấn học tập và sinh hoạt lớp sinh viên khóa 15 học kỳ 1", "Cố vấn học tập lớp sinh viên", "Công tác Sinh viên", "quy mô chuẩn", "Trung bình", "Thấp", "Cấp Khoa/Bộ môn", "Cá nhân", "Sổ nhật ký cố vấn học tập + Biên bản họp lớp đánh giá điểm rèn luyện HK1", "Phó Trưởng Khoa phụ trách CTSV", f"{y_start}-09-05", f"{y_end}-01-10", 15.0, "Thấp (9.8%)"),
+        (5, f"KH-{y_start}-005", "HK2", "Viết và công bố 01 bài báo khoa học trên tạp chí quốc tế thuộc danh mục Scopus Q2", "Viết bài báo quốc tế (ISI/Scopus)", "NCKH", "quy mô lớn", "Cao", "Cao", "TR-02 - Công bố bài báo quốc tế Scopus", "Phụ trách chính (Trưởng nhóm)", "Bản toàn văn bài báo + Email chấp nhận đăng (Acceptance Letter) + Minh chứng Scopus", "Hội đồng Khoa học Khoa CNTT", f"{y_start}-11-15", f"{y_end}-03-25", 45.0, "Trung bình (26.4%)"),
+        (6, f"KH-{y_start}-006", "HK2", "Chủ nhiệm đề tài nghiên cứu khoa học cấp Cơ sở năm học", "Thực hiện đề tài NCKH cấp Trường", "NCKH", "quy mô chuẩn", "Cao", "Cao", "TR-01 - Đề tài NCKH cấp Trường", "Phụ trách chính (Trưởng nhóm)", "Thuyết minh đề tài + Báo cáo tổng kết + Biên bản nghiệm thu cấp Trường", "Phòng Khoa học Công nghệ & BCN Khoa", f"{y_start}-10-15", f"{y_end}-04-20", 35.0, "Trung bình (24.0%)"),
+        (7, f"KH-{y_start}-007", "HK2", "Thu thập và chuẩn hóa bộ minh chứng Tiêu chuẩn 3 phục vụ kiểm định AUN-QA ngành CNPM", "Tự đánh giá chương trình đào tạo", "Kiểm định & ĐBCL", "quy mô chuẩn", "Cao", "Trung bình", "TR-03 - Đoàn Tự đánh giá & Kiểm định", "Thành viên nhóm", "Báo cáo tự đánh giá Tiêu chuẩn 3 + Danh mục mã hóa minh chứng số hóa", "Trưởng Khoa CNTT", f"{y_end}-02-10", f"{y_end}-04-15", 20.0, "Thấp (15.5%)"),
+        (8, f"KH-{y_start}-008", "HK2", "Hướng dẫn 04 sinh viên thực hiện Đồ án / Khóa luận tốt nghiệp đại học", "Hướng dẫn khóa luận tốt nghiệp", "Giảng dạy", "quy mô lớn", "Cao", "Trung bình", "Cấp Khoa/Bộ môn", "Cá nhân", "Quyết định giao đề tài + Nhận xét của GVHD + Cuốn báo cáo KLTN hoàn chỉnh", "Trưởng Bộ môn CNPM", f"{y_end}-01-20", f"{y_end}-05-25", 24.0, "Thấp (12.8%)"),
+        (9, f"KH-{y_start}-009", "HK2", "Bồi dưỡng và dẫn đoàn sinh viên tham gia kỳ thi Olympic Tin học Sinh viên Việt Nam", "Hướng dẫn sinh viên thi Olympic/NCKH", "Công tác Sinh viên", "quy mô chuẩn", "Trung bình", "Trung bình", "Cấp Khoa/Bộ môn", "Phụ trách chính (Trưởng nhóm)", "Kế hoạch ôn luyện + Danh sách đội tuyển + Giấy chứng nhận giải thưởng", "Ban Chủ nhiệm Khoa", f"{y_end}-02-15", f"{y_end}-05-10", 16.0, "Thấp (13.4%)"),
+        (10, f"KH-{y_start}-010", "HE", "Tham gia Hội đồng chấm Khóa luận tốt nghiệp và rà soát chuẩn đầu ra học kỳ Hè", "Tham gia hội đồng chấm khóa luận", "Hành chính & Quản lý", "quy mô chuẩn", "Trung bình", "Thấp", "Cấp Khoa/Bộ môn", "Cá nhân", "Biên bản chấm phản biện / hội đồng bảo vệ KLTN + Bảng tổng hợp điểm", "Trưởng Khoa CNTT", f"{y_end}-06-05", f"{y_end}-06-30", 10.0, "Thấp (8.5%)"),
+    ]
+
+    total_plan_hours = 0.0
+    for s in raw_samples:
+        stt, code, sem, title, ttype, tgroup, scale, prio, comp, sch_cat, role_str, note_str, rev_str, start_dt, end_dt, hrs, ml_est = s
+        ws.append([
+            stt, code, title, ttype, tgroup, scale, prio, comp,
+            sch_cat, lec_name, lec_code, lec_deg, lec_dept, role_str,
+            note_str, rev_str, sem, start_dt, end_dt, end_dt,
+            0, "Kế hoạch năm (Chưa mở)", "Trong hạn kế hoạch", 0, ml_est,
+            hrs, "Chưa nộp (Theo lịch KH)", "Nộp khi hoàn thành"
+        ])
+        total_plan_hours += float(hrs)
+
+    # Dòng tổng cộng cuối bảng (đủ 28 cột)
+    summary_row_idx = ws.max_row + 1
+    ws.append([
+        "TỔNG CỘNG", f"{len(raw_samples)} đầu việc", "Tổng khối lượng giờ chuẩn công tác kế hoạch năm học đăng ký",
+        "—", "5 nhóm việc", "—", "—", "—", "—", lec_name, lec_code, lec_deg, lec_dept, "—",
+        "Đạt định mức công tác năm (≥ 180 giờ chuẩn quy đổi)", "Ban Chủ nhiệm Khoa phê duyệt", "Cả năm",
+        f"{y_start}-09-01", f"{y_end}-08-31", f"{y_end}-08-31",
+        0, "Đã lập kế hoạch", "—", 0, "—",
+        round(total_plan_hours, 2), "—", "—"
+    ])
+
+    _autofit_columns(ws, thin_border)
+
+    # Tô đậm và nền nhẹ cho dòng Tổng cộng
+    total_fill = PatternFill(start_color="ECFDF5", end_color="ECFDF5", fill_type="solid")
+    total_font = Font(name="Arial", size=10, bold=True, color="065F46")
+    for col_i in range(1, len(headers) + 1):
+        c = ws.cell(row=summary_row_idx, column=col_i)
+        c.fill = total_fill
+        c.font = total_font
+        if col_i in (1, 2, 17, 26):
+            c.alignment = Alignment(horizontal="center", vertical="center")
+
+    # Sheet 2: Danh mục 35 Loại công việc cấp Khoa (Thông tư 20/2020/TT-BGDĐT) & Danh mục cấp Trường để tra cứu
+    ws_ref = wb.create_sheet(title="DanhMuc_DinhMuc_ThamChieu")
+    ref_headers = [
+        "STT",
+        "Phân cấp",
+        "Mã / ID",
+        "Tên Loại công việc chuẩn (Dùng để điền vào Cột E Sheet 1)",
+        "Nhóm công việc",
+        "Giờ chuẩn (Quy mô nhỏ)",
+        "Số ngày chuẩn (Nhỏ)",
+        "Giờ chuẩn (Quy mô chuẩn)",
+        "Số ngày chuẩn (Chuẩn)",
+        "Giờ chuẩn (Quy mô lớn)",
+        "Số ngày chuẩn (Lớn)",
+        "Ghi chú / Quy định áp dụng",
+    ]
+    thin_border_ref = _style_worksheet(
+        ws_ref,
+        "TRƯỜNG ĐẠI HỌC CÔNG THƯƠNG TP.HCM (HUIT) — KHOA CÔNG NGHỆ THÔNG TIN",
+        "BẢNG TRA CỨU DANH MỤC CÔNG VIỆC & ĐỊNH MỨC GIỜ CHUẨN QUY ĐỔI (THÔNG TƯ 20/2020/TT-BGDĐT)",
+        "Bảng tham chiếu chính thức giúp Giảng viên và Trưởng Bộ môn tra cứu đúng tên Loại công việc và Giờ chuẩn khi lập Kế hoạch Năm",
+        ref_headers,
+        header_color="1E3A8A",
+    )
+
+    all_tts = db.query(TaskType).order_by(TaskType.id.asc()).all()
+    row_counter = 1
+    for tt in all_tts:
+        sc_map = {s.scale: (s.conversion_hours, s.expected_duration_days) for s in tt.scales}
+        sm_h, sm_d = sc_map.get("quy mô nhỏ", (4.0, 3))
+        st_h, st_d = sc_map.get("quy mô chuẩn", (6.0, 5))
+        lg_h, lg_d = sc_map.get("quy mô lớn", (8.0, 7))
+        ws_ref.append([
+            row_counter,
+            "Danh mục Khoa CNTT",
+            f"DM-{tt.id:02d}",
+            tt.name,
+            tt.task_group,
+            sm_h,
+            sm_d,
+            st_h,
+            st_d,
+            lg_h,
+            lg_d,
+            getattr(tt, "description", None) or "Áp dụng theo định mức nội bộ Khoa CNTT & TT 20/2020/TT-BGDĐT",
+        ])
+        row_counter += 1
+
+    for sci in db.query(SchoolCatalogItem).filter_by(is_active=True).all():
+        ws_ref.append([
+            row_counter,
+            "Danh mục cấp Trường",
+            sci.code,
+            sci.name,
+            sci.task_type.task_group if sci.task_type else "Cấp Trường",
+            sci.conversion_hours,
+            10,
+            sci.conversion_hours,
+            14,
+            sci.conversion_hours,
+            21,
+            sci.note or "Nhiệm vụ cấp Trường ánh xạ giờ chuẩn trực tiếp",
+        ])
+        row_counter += 1
+
+    _autofit_columns(ws_ref, thin_border_ref)
 
     stream = io.BytesIO()
     wb.save(stream)
     stream.seek(0)
+    fn = f"KeHoach_CongTac_Nam_{lec_code}_{academic_year.replace('-', '_')}.xlsx"
     return StreamingResponse(
         stream,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=Mau_KeHoach_CongViec_Nam_2026_2027.xlsx"}
+        headers={"Content-Disposition": f"attachment; filename={fn}"}
+    )
+
+
+@router.get("/plans/{plan_id}/export")
+def export_single_plan_excel(
+    plan_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user),
+):
+    """Xuất file Excel chính thức của một Kế hoạch Công tác Năm đã import (đồng bộ 28 cột + tiến độ thực tế)."""
+    plan = db.get(Plan, plan_id)
+    if not plan:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Không tìm thấy bản Kế hoạch Năm")
+    if not can_see_lecturer(db, user, plan.lecturer_id):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Không có quyền xuất kế hoạch của giảng viên này")
+
+    lec = plan.lecturer
+    lec_name = lec.full_name if lec else "Giảng viên"
+    lec_code = lec.profile.lecturer_code if lec and lec.profile else f"GV{plan.lecturer_id:04d}"
+    lec_deg = f"{lec.profile.degree} / {lec.profile.academic_rank}" if lec and lec.profile else "Giảng viên"
+    lec_dept = lec.department.name if lec and lec.department else "Khoa CNTT"
+
+    tasks = db.query(Task).filter_by(plan_id=plan.id).order_by(Task.original_deadline.asc()).all()
+    scales = {
+        (tts.task_type_id, tts.scale): (tts.conversion_hours or 0.0)
+        for tts in db.query(TaskTypeScale).all()
+    }
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = f"KeHoach_{plan.academic_year.replace('-', '_')}"
+
+    headers = [
+        "STT", "Mã Công việc", "Tên Công việc", "Loại Công việc", "Nhóm việc", "Quy mô", "Mức ưu tiên", "Độ phức tạp",
+        "Danh mục Trường", "Họ và tên Giảng viên", "Mã GV", "Học vị / Chức danh", "Bộ môn", "Vai trò",
+        "Nhiệm vụ thành viên", "Người kiểm tra tiến độ", "Học kỳ", "Ngày giao", "Hạn chót gốc", "Hạn hiện tại",
+        "Tiến độ (%)", "Trạng thái", "Đánh giá hạn", "Độ lệch (ngày)", "Dự báo Rủi ro ML",
+        "Giờ chuẩn quy đổi", "Trạng thái Minh chứng", "File Minh chứng"
+    ]
+    thin_border = _style_worksheet(
+        ws,
+        "TRƯỜNG ĐẠI HỌC CÔNG THƯƠNG TP.HCM (HUIT) — KHOA CÔNG NGHỆ THÔNG TIN",
+        f"BẢNG KẾ HOẠCH CÔNG TÁC & THEO DÕI TIẾN ĐỘ NĂM HỌC ({plan.academic_year})",
+        f"Giảng viên: {lec_name} ({lec_code}) | Học vị: {lec_deg} | Bộ môn: {lec_dept} | File gốc: {plan.file_name}",
+        headers,
+        header_color="0F766E",
+    )
+
+    for idx, t in enumerate(tasks, start=1):
+        assign = db.query(TaskAssignment).filter_by(task_id=t.id, lecturer_id=plan.lecturer_id).first()
+        conv_hrs = (
+            t.school_item.conversion_hours
+            if t.school_item
+            else scales.get((t.task_type_id, t.scale), 10.0)
+        )
+        reviewer_u = t.reviewer if t.reviewer else t.creator
+        reviewer_name = reviewer_u.full_name if reviewer_u else "Ban Chủ nhiệm Khoa"
+        pred = (
+            db.query(RiskPrediction)
+            .filter_by(assignment_id=assign.id)
+            .order_by(desc(RiskPrediction.id))
+            .first()
+        ) if assign else None
+        ml_str = f"{pred.level} ({round((pred.probability or 0) * 100, 1)}%)" if (pred and pred.probability is not None) else "Chưa dự báo"
+        st_val = assign.status if assign else t.status
+        late_status = (
+            "Hoàn thành trễ hạn"
+            if (st_val == ST_DONE and assign and assign.is_late)
+            else ("Đúng hạn" if st_val == ST_DONE else ("Đang quá hạn" if t.current_deadline < date.today() else "Trong hạn"))
+        )
+
+        ws.append([
+            idx,
+            t.code,
+            t.title,
+            t.task_type.name if t.task_type else "",
+            t.task_type.task_group if t.task_type else "",
+            t.scale,
+            t.priority,
+            t.complexity,
+            f"{t.school_item.code} - {t.school_item.name}" if t.school_item else "Cấp Khoa/Bộ môn",
+            lec_name,
+            lec_code,
+            lec_deg,
+            lec_dept,
+            "Cá nhân (Kế hoạch năm)",
+            (assign.member_task_note if assign and assign.member_task_note else t.description) or "Thực hiện theo Kế hoạch Năm",
+            reviewer_name,
+            semester_of(t.original_deadline),
+            str(t.assigned_at.date()),
+            str(t.original_deadline),
+            str(t.current_deadline),
+            assign.progress_pct if assign else 0,
+            st_val,
+            late_status,
+            assign.delay_days if (assign and assign.delay_days is not None) else 0,
+            ml_str,
+            round(conv_hrs, 2),
+            (assign.member_evidence_status if assign and assign.member_evidence_status else "Chưa nộp"),
+            (assign.latest_evidence_name if assign and assign.latest_evidence_name else "Chưa nộp"),
+        ])
+
+    _autofit_columns(ws, thin_border)
+    stream = io.BytesIO()
+    wb.save(stream)
+    stream.seek(0)
+    fn = f"KeHoach_Nam_{lec_code}_{plan.academic_year.replace('-', '_')}.xlsx"
+    return StreamingResponse(
+        stream,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={fn}"},
     )
 
 
@@ -117,56 +547,13 @@ async def preview_plan_excel(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Định dạng file không hợp lệ. Vui lòng tải lên file Excel (.xlsx).")
 
     ws = wb.active
-    task_types = {tt.name.lower().strip(): tt.name for tt in db.query(TaskType).all()}
-    default_tt_name = next(iter(task_types.values()), "Giảng dạy học phần")
-
-    rows = []
-    errors = []
-    for idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
-        if not row or not row[0]:
-            continue
-        title = str(row[0]).strip()
-        raw_type = str(row[1]).strip() if len(row) > 1 and row[1] else default_tt_name
-        matched_type = task_types.get(raw_type.lower(), default_tt_name)
-        is_exact_type = raw_type.lower() in task_types
-
-        deadline_val = row[2] if len(row) > 2 else None
-        deadline_str = None
-        if isinstance(deadline_val, datetime):
-            deadline_str = deadline_val.date().isoformat()
-        elif isinstance(deadline_val, date):
-            deadline_str = deadline_val.isoformat()
-        elif deadline_val:
-            try:
-                deadline_str = date.fromisoformat(str(deadline_val).strip()[:10]).isoformat()
-            except Exception:
-                errors.append(f"Dòng {idx}: Ngày hạn chót '{deadline_val}' không đúng định dạng YYYY-MM-DD")
-                deadline_str = (date.today() + timedelta(days=30)).isoformat()
-        else:
-            deadline_str = (date.today() + timedelta(days=30)).isoformat()
-
-        priority = str(row[3]).strip() if len(row) > 3 and row[3] else "Trung bình"
-        if priority not in ("Thấp", "Trung bình", "Cao", "Khẩn cấp"):
-            priority = "Trung bình"
-
-        scale = str(row[4]).strip() if len(row) > 4 and row[4] else "quy mô chuẩn"
-        if scale not in ("quy mô nhỏ", "quy mô chuẩn", "quy mô lớn"):
-            scale = "quy mô chuẩn"
-
-        rows.append({
-            "row_number": idx,
-            "title": title,
-            "raw_task_type": raw_type,
-            "matched_task_type": matched_type,
-            "is_exact_type": is_exact_type,
-            "deadline": deadline_str,
-            "priority": priority,
-            "scale": scale
-        })
+    rows, errors = _parse_plan_rows_from_ws(ws, db)
+    total_hours = round(sum(r.get("conversion_hours", 0.0) for r in rows), 2)
 
     return {
         "file_name": file.filename,
         "total_rows": len(rows),
+        "total_conversion_hours": total_hours,
         "errors": errors,
         "rows": rows
     }
@@ -188,6 +575,10 @@ async def import_plan(
     wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
     ws = wb.active
 
+    parsed_rows, _ = _parse_plan_rows_from_ws(ws, db)
+    if not parsed_rows:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "File Excel không có dòng công việc kế hoạch nào hợp lệ.")
+
     plan = Plan(
         lecturer_id=lecturer_id,
         academic_year=academic_year,
@@ -199,49 +590,40 @@ async def import_plan(
     db.add(plan)
     db.flush()
 
-    task_types = {tt.name.lower().strip(): tt.id for tt in db.query(TaskType).all()}
-    default_tt_id = next(iter(task_types.values()))
+    s_year_dt, e_year_dt = year_range(academic_year)
     count = 0
-
-    for row in ws.iter_rows(min_row=2, values_only=True):
-        if not row or not row[0]:
-            continue
-        title = str(row[0]).strip()
-        type_name = str(row[1]).lower().strip() if len(row) > 1 and row[1] else ""
-        tt_id = task_types.get(type_name, default_tt_id)
-
-        deadline_val = row[2] if len(row) > 2 else None
-        if isinstance(deadline_val, datetime):
-            deadline_date = deadline_val.date()
-        elif isinstance(deadline_val, date):
-            deadline_date = deadline_val
-        elif deadline_val:
-            try:
-                deadline_date = date.fromisoformat(str(deadline_val).strip()[:10])
-            except Exception:
-                deadline_date = date.today() + timedelta(days=30)
-        else:
+    for r in parsed_rows:
+        try:
+            deadline_date = date.fromisoformat(r["deadline"])
+        except Exception:
             deadline_date = date.today() + timedelta(days=30)
 
-        priority = str(row[3]).strip() if len(row) > 3 and row[3] else "Trung bình"
-        if priority not in ("Thấp", "Trung bình", "Cao", "Khẩn cấp"):
-            priority = "Trung bình"
+        try:
+            start_d = date.fromisoformat(r.get("start_date") or "")
+            assigned_dt = datetime.combine(start_d, datetime.min.time())
+        except Exception:
+            assigned_dt = datetime.now()
 
-        scale = str(row[4]).strip() if len(row) > 4 and row[4] else "quy mô chuẩn"
-        if scale not in ("quy mô nhỏ", "quy mô chuẩn", "quy mô lớn"):
-            scale = "quy mô chuẩn"
+        # Đảm bảo assigned_at nằm trong khung năm học được chọn để đồng bộ 100% với Dashboard, Hồ sơ 1 năm & Xuất Excel 28 cột
+        if assigned_dt < s_year_dt or assigned_dt >= e_year_dt:
+            assigned_dt = s_year_dt + timedelta(days=15)
 
+        desc_text = r.get("deliverable") or f"Công việc thuộc Kế hoạch năm học {academic_year} ({file.filename})"
         task = Task(
             code=f"KH-{academic_year[:4]}-{plan.id}-{count+1:03d}",
-            title=title,
-            description=f"Công việc thuộc Kế hoạch năm học {academic_year} ({file.filename})",
-            task_type_id=tt_id,
-            scale=scale,
+            title=r["title"],
+            description=desc_text,
+            task_type_id=r["task_type_id"],
+            scale=r["scale"],
+            assigned_at=assigned_dt,
             original_deadline=deadline_date,
             current_deadline=deadline_date,
-            priority=priority,
+            priority=r["priority"],
+            complexity=r.get("complexity", "Trung bình"),
+            school_catalog_id=r.get("school_catalog_id"),
             status=ST_NEW,
             created_by=user.id,
+            reviewer_id=user.id,
             plan_id=plan.id
         )
         db.add(task)
@@ -250,6 +632,8 @@ async def import_plan(
         assign = TaskAssignment(
             task_id=task.id,
             lecturer_id=lecturer_id,
+            is_lead=True,
+            member_task_note=r.get("deliverable") or "Thực hiện theo Kế hoạch Công tác Năm",
             progress_pct=0,
             status=ST_NEW
         )
@@ -863,16 +1247,17 @@ def export_excel(
     ws.title = "BaoCao_CongViec"
 
     headers = [
-        "STT", "Mã Công việc", "Tên Công việc", "Loại Công việc", "Nhóm việc", "Danh mục Trường",
-        "Họ và tên Giảng viên", "Mã GV", "Bộ môn", "Vai trò", "Người kiểm tra tiến độ",
-        "Học kỳ", "Ngày giao", "Hạn chót gốc", "Hạn hiện tại",
-        "Tiến độ (%)", "Trạng thái", "Đánh giá hạn", "Độ lệch (ngày)", "Giờ chuẩn quy đổi", "Minh chứng"
+        "STT", "Mã Công việc", "Tên Công việc", "Loại Công việc", "Nhóm việc", "Quy mô", "Mức ưu tiên", "Độ phức tạp",
+        "Danh mục Trường", "Họ và tên Giảng viên", "Mã GV", "Học vị / Chức danh", "Bộ môn", "Vai trò",
+        "Nhiệm vụ thành viên", "Người kiểm tra tiến độ", "Học kỳ", "Ngày giao", "Hạn chót gốc", "Hạn hiện tại",
+        "Tiến độ (%)", "Trạng thái", "Đánh giá hạn", "Độ lệch (ngày)", "Dự báo Rủi ro ML",
+        "Giờ chuẩn quy đổi", "Trạng thái Minh chứng", "File Minh chứng"
     ]
     sem_label = semester if semester else "Cả năm học"
     thin_border = _style_worksheet(
         ws,
         "TRƯỜNG ĐẠI HỌC CÔNG THƯƠNG TP.HCM (HUIT) — KHOA CÔNG NGHỆ THÔNG TIN",
-        f"BÁO CÁO TỔNG HỢP PHÂN CÔNG & TIẾN ĐỘ CÔNG VIỆC ({academic_year} - {sem_label})",
+        f"BÁO CÁO TỔNG HỢP PHÂN CÔNG, TIẾN ĐỘ & QUY ĐỔI GIỜ CHUẨN ({academic_year} - {sem_label})",
         f"Ngày trích xuất: {datetime.now().strftime('%d/%m/%Y %H:%M')} | Tổng số bản ghi phân công: {len(assignments)}",
         headers,
         header_color="1E3A8A"
@@ -883,6 +1268,7 @@ def export_excel(
         for tts in db.query(TaskTypeScale).all()
     }
 
+    lec_summary = {}
     for idx, a in enumerate(assignments, start=1):
         conv_hrs = (
             a.task.school_item.conversion_hours
@@ -892,7 +1278,7 @@ def export_excel(
         reviewer_u = a.task.reviewer if a.task.reviewer else a.task.creator
         reviewer_name = reviewer_u.full_name if reviewer_u else "Hệ thống"
         role_in_task = (
-            "Phụ trách chính"
+            "Phụ trách chính (Trưởng nhóm)"
             if (a.is_lead or a.task.lead_lecturer_id == a.lecturer_id) and a.task.assignment_mode == "Group"
             else ("Thành viên nhóm" if a.task.assignment_mode == "Group" else "Cá nhân")
         )
@@ -905,19 +1291,34 @@ def export_excel(
                 else ("Đang quá hạn" if a.task.current_deadline < date.today() else "Trong hạn")
             )
         )
+        pred = (
+            db.query(RiskPrediction)
+            .filter_by(assignment_id=a.id)
+            .order_by(desc(RiskPrediction.id))
+            .first()
+        )
+        ml_str = f"{pred.level} ({round((pred.probability or 0) * 100, 1)}%)" if (pred and pred.probability is not None) else "Chưa dự báo"
+        deg_rank = f"{a.lecturer.profile.degree} / {a.lecturer.profile.academic_rank}" if a.lecturer.profile else "Giảng viên"
+        ev_status = a.member_evidence_status or ("Đã nộp" if a.latest_evidence_name else "Chưa nộp")
+
         ws.append([
             idx,
             a.task.code,
             a.task.title,
-            a.task.task_type.name,
-            a.task.task_type.task_group,
+            a.task.task_type.name if a.task.task_type else "",
+            a.task.task_type.task_group if a.task.task_type else "",
+            a.task.scale,
+            a.task.priority,
+            a.task.complexity,
             f"{a.task.school_item.code} - {a.task.school_item.name}" if a.task.school_item else "Cấp Khoa/Bộ môn",
             a.lecturer.full_name,
             a.lecturer.profile.lecturer_code if a.lecturer.profile else "",
+            deg_rank,
             a.lecturer.department.name if a.lecturer.department else "",
             role_in_task,
+            a.member_task_note or "Thực hiện theo mô tả chung",
             reviewer_name,
-            semester_of(a.task.assigned_at.date()),
+            semester_of(a.task.original_deadline),
             str(a.task.assigned_at.date()),
             str(a.task.original_deadline),
             str(a.task.current_deadline),
@@ -925,11 +1326,69 @@ def export_excel(
             a.status,
             late_status,
             a.delay_days if a.delay_days is not None else 0,
+            ml_str,
             round(conv_hrs, 2),
+            ev_status,
             a.latest_evidence_name or "Chưa nộp"
         ])
 
+        lid = a.lecturer_id
+        if lid not in lec_summary:
+            lec_summary[lid] = {
+                "code": a.lecturer.profile.lecturer_code if a.lecturer.profile else f"GV{lid:04d}",
+                "name": a.lecturer.full_name,
+                "deg_rank": deg_rank,
+                "dept": a.lecturer.department.name if a.lecturer.department else "Khoa CNTT",
+                "teaching_hours": round((a.lecturer.profile.teaching_hours_semester if a.lecturer.profile and a.lecturer.profile.teaching_hours_semester else 135.0) * 2, 1),
+                "total": 0,
+                "done": 0,
+                "on_time": 0,
+                "late": 0,
+                "lead_count": 0,
+                "hours": 0.0
+            }
+        lec_summary[lid]["total"] += 1
+        lec_summary[lid]["hours"] = round(lec_summary[lid]["hours"] + conv_hrs, 2)
+        if "Phụ trách chính" in role_in_task:
+            lec_summary[lid]["lead_count"] += 1
+        if a.status == ST_DONE:
+            lec_summary[lid]["done"] += 1
+            if a.is_late:
+                lec_summary[lid]["late"] += 1
+            else:
+                lec_summary[lid]["on_time"] += 1
+
     _autofit_columns(ws, thin_border)
+
+    # Sheet 2: Tổng hợp Định mức Giờ chuẩn & Đánh giá Giảng viên (Thông tư 20/2020/TT-BGDĐT)
+    ws_lec = wb.create_sheet(title="TongHop_GioChuan_GV")
+    headers_lec = [
+        "STT", "Mã Giảng viên", "Họ và tên Giảng viên", "Học vị / Chức danh", "Bộ môn",
+        "Tổng đầu việc", "Số lần làm Trưởng nhóm", "Hoàn thành Đúng hạn", "Hoàn thành Trễ hạn",
+        "Tỷ lệ Đúng hạn (%)", "Giờ giảng dạy năm (Định mức 270h)", "Giờ chuẩn công tác quy đổi",
+        "Tổng giờ chuẩn tích lũy", "Xếp loại hoàn thành"
+    ]
+    thin_border_lec = _style_worksheet(
+        ws_lec,
+        "TRƯỜNG ĐẠI HỌC CÔNG THƯƠNG TP.HCM (HUIT) — KHOA CÔNG NGHỆ THÔNG TIN",
+        f"BẢNG TỔNG HỢP KHỐI LƯỢNG GIỜ CHUẨN & ĐÁNH GIÁ GIẢNG VIÊN ({academic_year} - {sem_label})",
+        "Áp dụng theo khung Thông tư 20/2020/TT-BGDĐT của Bộ GD&ĐT và Quy chế chi tiêu nội bộ",
+        headers_lec,
+        header_color="0F766E"
+    )
+    for idx, item in enumerate(lec_summary.values(), start=1):
+        ot_rate = round(item["on_time"] / item["done"] * 100, 1) if item["done"] > 0 else 100.0
+        total_hrs = round(item["teaching_hours"] + item["hours"], 2)
+        rank_eval = (
+            "Hoàn thành xuất sắc" if (ot_rate >= 90 and item["hours"] >= 150)
+            else ("Hoàn thành tốt" if ot_rate >= 80 else "Cần nhắc nhở tiến độ")
+        )
+        ws_lec.append([
+            idx, item["code"], item["name"], item["deg_rank"], item["dept"],
+            item["total"], item["lead_count"], item["on_time"], item["late"],
+            ot_rate, item["teaching_hours"], item["hours"], total_hrs, rank_eval
+        ])
+    _autofit_columns(ws_lec, thin_border_lec)
 
     stream = io.BytesIO()
     wb.save(stream)
@@ -1183,18 +1642,48 @@ def retrain_ml_online(
     except Exception as e:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Không thể kết nối tới ML Service để train: {str(e)[:200]}")
 
-    # Cập nhật lại dự đoán cho các công việc đang thực hiện bằng mô hình vừa train
+    # Cập nhật lại dự đoán cho các công việc đang thực hiện theo lô (Batch TabPFN v2) để phản hồi tức thì
+    from app.ml_client import preview_risk_for_features_batch
     open_assigns = db.query(TaskAssignment).filter(TaskAssignment.status != ST_DONE).all()
-    refreshed = 0
+    open_valid = []
+    open_feats = []
     for oa in open_assigns:
         try:
-            predict_and_record_risk(db, oa.task_id, oa.id, oa.lecturer_id, trigger="retrain")
-            refreshed += 1
+            f = extract_features_for_assignment(db, oa.task_id, oa.lecturer_id, at=datetime.now())
+            open_valid.append(oa)
+            open_feats.append(f)
         except Exception:
             pass
 
+    refreshed = 0
+    if open_feats:
+        batch_res = preview_risk_for_features_batch(open_feats)
+        for oa, f, data in zip(open_valid, open_feats, batch_res):
+            if data.get("status") == "ok" and data.get("probability") is not None:
+                pred_record = RiskPrediction(
+                    task_id=oa.task_id,
+                    assignment_id=oa.id,
+                    lecturer_id=oa.lecturer_id,
+                    trigger="retrain",
+                    status="ok",
+                    features_json=json.dumps(f, ensure_ascii=False),
+                    probability=data.get("probability"),
+                    level=data.get("level"),
+                    uncertainty=data.get("uncertainty"),
+                    top_factors=json.dumps(data.get("top_factors", []), ensure_ascii=False),
+                    recommendation=data.get("recommendation"),
+                    low_confidence=data.get("low_confidence", False),
+                    model_version=data.get("model_version"),
+                    latency_ms=data.get("latency_ms", 120),
+                    created_at=datetime.now(),
+                    predicted_at=datetime.now()
+                )
+                db.add(pred_record)
+                refreshed += 1
+        db.commit()
+
     return {
-        "message": f"Đã huấn luyện trực tiếp mô hình từ {len(records)} dữ liệu công việc thực tế và cập nhật dự báo cho {refreshed} việc đang mở!",
+        "message": f"Đã kiểm định rào chắn chất lượng & cập nhật ngữ cảnh TabPFN v2 từ {len(records)} mẫu thực tế (cập nhật dự báo {refreshed} việc đang mở).",
         "train_result": train_result,
         "refreshed_open_tasks": refreshed
     }

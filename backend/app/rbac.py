@@ -207,19 +207,6 @@ def ensure_rbac_catalog(db: Session) -> None:
     except Exception:
         pass
 
-    # Chuẩn hóa tên hiển thị của 4 Bộ môn chính trong Khoa CNTT (giữ nguyên ml_name/code cho mô hình ML)
-    main_dept_names = {
-        1: "Bộ môn Công nghệ phần mềm (K01)",
-        2: "Bộ môn Hệ thống thông tin (K02)",
-        3: "Bộ môn Khoa học máy tính (K03)",
-        4: "Bộ môn Mạng máy tính & ATTT (K04)",
-    }
-    for did, dname in main_dept_names.items():
-        d_obj = db.get(Department, did)
-        if d_obj and d_obj.name != dname:
-            d_obj.name = dname
-    db.flush()
-
     for r_data in ROLE_DEFINITIONS:
         role_obj = db.get(RoleDefinition, r_data["code"])
         if not role_obj:

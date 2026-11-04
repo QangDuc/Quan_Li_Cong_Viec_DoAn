@@ -34,6 +34,7 @@ def mark_read(notif_id: int, db: Session = Depends(get_db), user: User = Depends
         db.commit()
     return {"message": "Đã đánh dấu đã đọc"}
 
+@router.post("/notifications/scan")
 @router.post("/notifications/scan-deadlines")
 def scan_deadlines(db: Session = Depends(get_db), user: User = Depends(current_user)):
     """Quét tự động các công việc sắp đến hạn (<= 3 ngày) và quá hạn để tạo thông báo nhắc nhở (FR-02, FR-03)."""
@@ -75,8 +76,11 @@ def scan_deadlines(db: Session = Depends(get_db), user: User = Depends(current_u
     return {"message": f"Đã quét nhắc hạn công việc: tạo mới {created} thông báo", "created": created}
 
 @router.get("/departments")
-def get_departments(db: Session = Depends(get_db)):
-    return db.query(Department).all()
+def get_departments(all_catalog: bool = False, db: Session = Depends(get_db)):
+    q = db.query(Department).order_by(Department.id.asc())
+    if not all_catalog:
+        q = q.filter(Department.id <= 4)
+    return q.all()
 
 @router.get("/task-types")
 def get_task_types(db: Session = Depends(get_db)):

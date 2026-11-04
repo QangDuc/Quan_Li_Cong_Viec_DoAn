@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
-  Award, CheckCircle2, AlertTriangle, FileDown,
+  Award, CheckCircle2, FileDown,
   BarChart3, ShieldAlert, Layers, Calendar, BookOpen, Check, XCircle
 } from "lucide-react";
 
@@ -66,9 +66,9 @@ export const LecturerEvaluationView: React.FC<Props> = ({ token, currentUser, us
     }
   };
 
-  if (loading || !data) {
+  if (!data) {
     return (
-      <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm text-center text-slate-500">
+      <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-2xs text-center text-slate-500 text-xs font-medium">
         Đang tải Hồ sơ Đánh giá Công việc 1 năm của Giảng viên...
       </div>
     );
@@ -78,35 +78,35 @@ export const LecturerEvaluationView: React.FC<Props> = ({ token, currentUser, us
   const filteredTasks = semFilter === "ALL" ? tasks : tasks.filter((t: any) => t.semester === semFilter);
 
   return (
-    <div className="space-y-6">
-      {/* Thanh chọn giảng viên & năm học */}
-      <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-4">
+    <div className={`space-y-5 transition-opacity duration-150 ${loading ? "opacity-65 pointer-events-none" : "opacity-100"}`}>
+      {/* Thanh chọn giảng viên & năm học (Cố định chiều cao nút h-9, không nhảy bố cục) */}
+      <div className="bg-white p-4 rounded-2xl shadow-2xs border border-slate-200 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-lg shadow-sm">
+          <div className="w-11 h-11 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-base shadow-xs shrink-0">
             {lecturer.lecturer_code?.slice(-2) || "GV"}
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-bold text-slate-900">{lecturer.full_name}</h2>
-              <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-base font-extrabold text-slate-900">{lecturer.full_name}</h2>
+              <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-blue-50 text-blue-700 border border-blue-200">
                 Mã GV: {lecturer.lecturer_code}
               </span>
-              <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                Hồ sơ Công tác Năm học ({academicYear})
+              <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                Năm học {academicYear}
               </span>
             </div>
-            <p className="text-sm text-slate-500 mt-0.5">
-              {lecturer.degree} • {lecturer.academic_rank} • {lecturer.department_name} • Email: {lecturer.email}
+            <p className="text-xs text-slate-500 mt-0.5">
+              {lecturer.degree} • {lecturer.academic_rank} • {lecturer.department_name} • {lecturer.email}
             </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           {currentUser?.role !== "lecturer" && (
             <select
               value={selectedLecturerId}
               onChange={(e) => setSelectedLecturerId(Number(e.target.value))}
-              className="px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+              className="h-9 px-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
             >
               {lecturers.map((u) => (
                 <option key={u.id} value={u.id}>
@@ -118,89 +118,92 @@ export const LecturerEvaluationView: React.FC<Props> = ({ token, currentUser, us
           <select
             value={academicYear}
             onChange={(e) => setAcademicYear(e.target.value)}
-            className="px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium text-slate-800"
+            className="h-9 px-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none"
           >
             <option value="2026-2027">Năm học 2026-2027</option>
             <option value="2025-2026">Năm học 2025-2026</option>
           </select>
           <button
+            type="button"
             onClick={handleExportLecturerExcel}
-            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-semibold shadow-sm transition cursor-pointer"
+            className="h-9 flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 border border-emerald-600 text-white px-3.5 rounded-xl text-xs font-bold shadow-2xs transition cursor-pointer"
           >
-            <FileDown className="w-4 h-4" /> Xuất Hồ sơ 1 Năm (.xlsx)
+            <FileDown className="w-3.5 h-3.5" /> Xuất Hồ sơ Excel
           </button>
         </div>
       </div>
 
-      {/* 5 Thẻ KPI Tổng hợp 1 năm */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-500 uppercase">
-            <span>Tổng đầu việc 1 năm</span>
+      {/* 4 Thẻ KPI Tổng hợp 1 năm (Gọn gàng, vừa đủ thông tin trên 1 hàng) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex flex-col justify-between">
+          <div className="flex items-center justify-between text-xs font-bold text-slate-500 uppercase">
+            <span>Tổng Đầu việc & Tiến độ</span>
             <Layers className="w-4 h-4 text-blue-600" />
           </div>
-          <p className="text-3xl font-bold text-slate-900 mt-2">{summary.total_tasks}</p>
-          <p className="text-xs text-slate-500 mt-1">
-            Hoàn thành: <b className="text-emerald-600">{summary.completed_total}</b> ({summary.completion_rate}%) • Đang mở:{" "}
+          <div className="my-1.5 flex items-baseline gap-2">
+            <span className="text-2xl font-extrabold text-slate-900">{summary.total_tasks}</span>
+            <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+              Hoàn thành {summary.completion_rate}%
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-500">
+            Đã xong: <b className="text-slate-800">{summary.completed_total}</b> • Đang mở:{" "}
             <b className="text-blue-600">{summary.in_progress + summary.new_tasks}</b>
           </p>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-500 uppercase">
-            <span>Đúng hạn & Sớm hạn</span>
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex flex-col justify-between">
+          <div className="flex items-center justify-between text-xs font-bold text-slate-500 uppercase">
+            <span>Đúng hạn vs Trễ hạn</span>
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
           </div>
-          <p className="text-3xl font-bold text-emerald-600 mt-2">{summary.completed_on_time}</p>
-          <p className="text-xs text-slate-500 mt-1">
-            Tỷ lệ đúng hạn: <b>{summary.on_time_rate}%</b> (Sớm hạn: {summary.completed_early} việc)
-          </p>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-500 uppercase">
-            <span>Hoàn thành trễ & Quá hạn</span>
-            <AlertTriangle className="w-4 h-4 text-rose-600" />
+          <div className="my-1.5 flex items-baseline gap-2">
+            <span className="text-2xl font-extrabold text-emerald-600">{summary.on_time_rate}%</span>
+            <span className="text-xs text-slate-500">đúng hạn ({summary.completed_on_time} việc)</span>
           </div>
-          <p className="text-3xl font-bold text-rose-600 mt-2">
-            {summary.completed_late} <span className="text-sm font-normal text-slate-500">/ {summary.overdue_open} quá hạn mở</span>
-          </p>
-          <p className="text-xs text-slate-500 mt-1">
-            Sắp đến hạn (≤5 ngày): <b className="text-amber-600">{summary.due_soon_open} việc</b>
+          <p className="text-[11px] text-slate-500">
+            Sớm hạn: <b className="text-emerald-700">{summary.completed_early}</b> • Trễ/Quá hạn:{" "}
+            <b className="text-rose-600">{summary.completed_late + summary.overdue_open}</b>
           </p>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-500 uppercase">
-            <span>Giờ chuẩn quy đổi</span>
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex flex-col justify-between">
+          <div className="flex items-center justify-between text-xs font-bold text-slate-500 uppercase">
+            <span>Giờ chuẩn Quy đổi</span>
             <Award className="w-4 h-4 text-indigo-600" />
           </div>
-          <p className="text-3xl font-bold text-indigo-700 mt-2">
-            {summary.total_task_converted_hours} <span className="text-sm font-normal">giờ</span>
-          </p>
-          <p className="text-xs text-slate-500 mt-1">
+          <div className="my-1.5 flex items-baseline gap-1.5">
+            <span className="text-2xl font-extrabold text-indigo-700">{summary.total_task_converted_hours}</span>
+            <span className="text-xs text-slate-500">/ {summary.target_task_hours}h định mức</span>
+          </div>
+          <p className="text-[11px] text-slate-500">
             Cấp Khoa: <b>{summary.faculty_converted_hours}h</b> • Cấp Trường: <b>{summary.school_mapped_hours}h</b>
           </p>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-500 uppercase">
-            <span>Tỷ lệ Dự báo Khớp thực tế</span>
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex flex-col justify-between">
+          <div className="flex items-center justify-between text-xs font-bold text-slate-500 uppercase">
+            <span>Dự báo AI Khớp Thực tế</span>
             <ShieldAlert className="w-4 h-4 text-purple-600" />
           </div>
-          <p className="text-3xl font-bold text-purple-700 mt-2">{ml_audit.overall_accuracy}%</p>
-          <p className="text-xs text-slate-500 mt-1">
-            Cảnh báo đúng {ml_audit.high_risk_actual_late}/{ml_audit.high_risk_total} việc Nguy cơ Cao
+          <div className="my-1.5 flex items-baseline gap-2">
+            <span className="text-2xl font-extrabold text-purple-700">{ml_audit.overall_accuracy}%</span>
+            <span className="text-xs text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full font-semibold">
+              {ml_audit.records.length} lượt đối chiếu
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-500">
+            Báo đúng <b>{ml_audit.high_risk_actual_late}/{ml_audit.high_risk_total}</b> việc Nguy cơ Cao
           </p>
         </div>
       </div>
 
-      {/* Thanh Sub-tabs trong Hồ sơ 1 năm */}
-      <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+      {/* Thanh Sub-tabs trong Hồ sơ 1 năm (Cố định 4 cột bằng nhau, cao h-10, có border cả 2 trạng thái -> Không bao giờ nhảy dòng) */}
+      <div className="bg-white p-2 rounded-2xl border border-slate-200 shadow-2xs grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
         {[
-          { id: "overview", label: "1. Tổng hợp Học kỳ & Định mức Giờ chuẩn", icon: Calendar },
-          { id: "tasks", label: `2. Danh sách Công việc Cả năm (${tasks.length})`, icon: BookOpen },
-          { id: "matrix", label: `3. Thống kê Năng lực theo Loại việc (${task_personnel_matrix.length})`, icon: BarChart3 },
+          { id: "overview", label: "1. Tổng hợp Học kỳ & Giờ chuẩn", icon: Calendar },
+          { id: "tasks", label: `2. Công việc Cả năm (${tasks.length})`, icon: BookOpen },
+          { id: "matrix", label: `3. Năng lực theo Loại việc (${task_personnel_matrix.length})`, icon: BarChart3 },
           { id: "ml_audit", label: `4. Đối chiếu Dự báo & Thực tế (${ml_audit.records.length})`, icon: ShieldAlert },
         ].map((t) => {
           const Icon = t.icon;
@@ -208,15 +211,16 @@ export const LecturerEvaluationView: React.FC<Props> = ({ token, currentUser, us
           return (
             <button
               key={t.id}
+              type="button"
               onClick={() => setSubTab(t.id as any)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition cursor-pointer ${
+              className={`h-10 px-3 rounded-xl text-xs font-bold border flex items-center justify-center gap-2 transition cursor-pointer select-none truncate ${
                 active
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+                  ? "bg-blue-600 text-white border-blue-600 shadow-2xs"
+                  : "bg-slate-50/80 text-slate-700 border-slate-200/90 hover:bg-slate-100"
               }`}
             >
-              <Icon className="w-4 h-4" />
-              {t.label}
+              <Icon className="w-4 h-4 shrink-0" />
+              <span className="truncate">{t.label}</span>
             </button>
           );
         })}
@@ -309,20 +313,21 @@ export const LecturerEvaluationView: React.FC<Props> = ({ token, currentUser, us
 
       {/* SUB-TAB 2: DANH SÁCH 18 CÔNG VIỆC TRONG 1 NĂM */}
       {subTab === "tasks" && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
           <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
             <div className="font-bold text-slate-800 text-sm">
               Danh sách Toàn bộ Công việc trong Năm học {academicYear} của {lecturer.full_name}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               {["ALL", "HK1", "HK2", "HE"].map((sem) => (
                 <button
                   key={sem}
+                  type="button"
                   onClick={() => setSemFilter(sem)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer ${
+                  className={`h-8 px-3 rounded-lg text-xs font-semibold border transition cursor-pointer ${
                     semFilter === sem
-                      ? "bg-blue-600 text-white"
-                      : "bg-white border border-slate-300 text-slate-600 hover:bg-slate-100"
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-white border-slate-300 text-slate-600 hover:bg-slate-100"
                   }`}
                 >
                   {sem === "ALL" ? `Cả năm (${tasks.length})` : sem === "HE" ? "Học kỳ Hè" : sem}
@@ -331,10 +336,10 @@ export const LecturerEvaluationView: React.FC<Props> = ({ token, currentUser, us
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
             <table className="w-full text-left border-collapse text-sm">
-              <thead>
-                <tr className="bg-slate-100/80 border-b border-slate-200 text-slate-600 text-xs uppercase">
+              <thead className="sticky top-0 z-10 bg-slate-100 border-b border-slate-200 text-slate-600 text-xs uppercase">
+                <tr>
                   <th className="p-3.5">Mã & Tên công việc</th>
                   <th className="p-3.5">Học kỳ / Nhóm</th>
                   <th className="p-3.5">Hạn gốc / Hiện tại</th>
@@ -433,7 +438,7 @@ export const LecturerEvaluationView: React.FC<Props> = ({ token, currentUser, us
                           >
                             Nguy cơ {t.ml_prediction.level}: {(t.ml_prediction.probability * 100).toFixed(1)}%
                           </span>
-                          <p className="text-slate-500 line-clamp-2">{t.ml_prediction.recommendation}</p>
+                          <p className="text-slate-500 line-clamp-1">{t.ml_prediction.recommendation}</p>
                         </div>
                       ) : (
                         <span className="text-slate-400 italic">Chưa có dự báo</span>
@@ -449,19 +454,21 @@ export const LecturerEvaluationView: React.FC<Props> = ({ token, currentUser, us
 
       {/* SUB-TAB 3: MA TRẬN TÁC VỤ - NHÂN SỰ */}
       {subTab === "matrix" && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="p-5 bg-slate-50 border-b border-slate-200">
-            <h3 className="font-bold text-slate-800 text-base">
-              Thống kê Năng lực Thực hiện theo từng Loại Công việc của {lecturer.full_name}
-            </h3>
-            <p className="text-xs text-slate-500 mt-1">
-              Đối sánh lịch sử hoàn thành đúng hạn / trễ hạn của giảng viên trên từng nhóm công việc so với mặt bằng chung của Bộ môn và toàn Khoa CNTT.
-            </p>
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
+          <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="font-bold text-slate-800 text-sm">
+                Thống kê Năng lực Thực hiện theo từng Loại Công việc của {lecturer.full_name}
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Đối sánh tỷ lệ trễ cá nhân trên từng nhóm việc so với trung bình Bộ môn và toàn Khoa CNTT.
+              </p>
+            </div>
           </div>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
             <table className="w-full text-left border-collapse text-sm">
-              <thead>
-                <tr className="bg-slate-100 text-slate-600 text-xs uppercase border-b">
+              <thead className="sticky top-0 z-10 bg-slate-100 text-slate-600 text-xs uppercase border-b border-slate-200">
+                <tr>
                   <th className="p-3.5">Loại công việc</th>
                   <th className="p-3.5">Nhóm việc</th>
                   <th className="p-3.5 text-center">Số lần giao</th>
@@ -486,9 +493,9 @@ export const LecturerEvaluationView: React.FC<Props> = ({ token, currentUser, us
                     <td className="p-3.5 text-center">
                       <span
                         className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                          row.lecturer_late_rate >= 44
+                          row.lecturer_late_rate >= 52
                             ? "bg-rose-100 text-rose-700"
-                            : row.lecturer_late_rate >= 22
+                            : row.lecturer_late_rate >= 23
                             ? "bg-amber-100 text-amber-800"
                             : "bg-emerald-100 text-emerald-700"
                         }`}
@@ -512,114 +519,113 @@ export const LecturerEvaluationView: React.FC<Props> = ({ token, currentUser, us
 
       {/* SUB-TAB 4: ĐỐI CHIẾU DỰ ĐOÁN ML VS KẾT QUẢ THỰC TẾ */}
       {subTab === "ml_audit" && (
-        <div className="space-y-4">
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
+          <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="font-bold text-slate-800 text-base">
-                Bảng Đối chiếu Lịch sử Dự báo Lúc giao việc & Kết quả Thực tế
+              <h3 className="font-bold text-slate-800 text-sm">
+                Bảng Đối chiếu Lịch sử Dự báo Lúc giao việc & Kết quả Thực tế ({ml_audit.records.length} lượt)
               </h3>
-              <p className="text-xs text-slate-500 mt-1">
-                Phân tầng mức nguy cơ trễ hạn: <b>Thấp (&lt; 22%)</b> •{" "}
-                <b>Trung bình (22% – 44%)</b> • <b>Cao (≥ 44%)</b>.
+              <p className="text-xs text-slate-500 mt-0.5">
+                Ngưỡng cảnh báo động V4: <b className="text-emerald-700">Thấp (&lt; 23%)</b> •{" "}
+                <b className="text-amber-700">Trung bình (23% – 52%)</b> • <b className="text-rose-700">Cao (≥ 52%)</b>
               </p>
             </div>
-            <div className="flex items-center gap-4 text-xs">
-              <div className="px-3.5 py-2 rounded-xl bg-rose-50 border border-rose-200 text-rose-800">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <div className="px-3 py-1.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800">
                 Nguy cơ Cao báo đúng: <b>{ml_audit.high_risk_actual_late}/{ml_audit.high_risk_total}</b> ({ml_audit.high_risk_precision}%)
               </div>
-              <div className="px-3.5 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800">
+              <div className="px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800">
                 Nguy cơ Thấp đúng hạn: <b>{ml_audit.low_risk_actual_on_time}/{ml_audit.low_risk_total}</b> ({ml_audit.low_risk_accuracy}%)
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-sm">
-                <thead>
-                  <tr className="bg-slate-100 text-slate-600 text-xs uppercase border-b">
-                    <th className="p-3.5">Công việc</th>
-                    <th className="p-3.5 text-center">Dự báo lúc giao</th>
-                    <th className="p-3.5">Nguyên nhân chính & Khuyến nghị</th>
-                    <th className="p-3.5 text-center">Kết quả Thực tế</th>
-                    <th className="p-3.5 text-center">Đối chiếu</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  {ml_audit.records.map((r: any) => (
-                    <tr key={r.task_id} className="hover:bg-slate-50">
-                      <td className="p-3.5 max-w-xs">
-                        <div className="text-xs font-mono font-bold text-blue-700">{r.task_code} ({r.semester})</div>
-                        <div className="font-semibold text-slate-900 mt-0.5">{r.task_title}</div>
-                        <div className="text-xs text-slate-500 mt-0.5">Hạn gốc: {r.original_deadline}</div>
-                      </td>
-                      <td className="p-3.5 text-center">
-                        <span
-                          className={`inline-block px-2.5 py-1 rounded-lg text-xs font-bold ${
-                            r.level === "Cao"
-                              ? "bg-rose-100 text-rose-700"
-                              : r.level === "Trung bình"
-                              ? "bg-amber-100 text-amber-800"
-                              : "bg-emerald-100 text-emerald-700"
-                          }`}
-                        >
-                          {r.level} ({(r.probability * 100).toFixed(1)}%)
+          <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
+            <table className="w-full text-left border-collapse text-sm">
+              <thead className="sticky top-0 z-10 bg-slate-100 text-slate-600 text-xs uppercase border-b border-slate-200">
+                <tr>
+                  <th className="p-3.5">Công việc</th>
+                  <th className="p-3.5 text-center">Dự báo lúc giao</th>
+                  <th className="p-3.5">Yếu tố chính & Khuyến nghị</th>
+                  <th className="p-3.5 text-center">Kết quả Thực tế</th>
+                  <th className="p-3.5 text-center">Đối chiếu</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {ml_audit.records.map((r: any) => (
+                  <tr key={r.task_id} className="hover:bg-slate-50">
+                    <td className="p-3.5 max-w-xs">
+                      <div className="text-xs font-mono font-bold text-blue-700">{r.task_code} ({r.semester})</div>
+                      <div className="font-semibold text-slate-900 mt-0.5">{r.task_title}</div>
+                      <div className="text-xs text-slate-500 mt-0.5">Hạn gốc: {r.original_deadline}</div>
+                    </td>
+                    <td className="p-3.5 text-center">
+                      <span
+                        className={`inline-block px-2.5 py-1 rounded-lg text-xs font-bold border ${
+                          r.level === "Cao" || r.probability >= 0.52
+                            ? "bg-rose-100 text-rose-700 border-rose-200"
+                            : r.level === "Trung bình" || r.probability >= 0.23
+                            ? "bg-amber-100 text-amber-800 border-amber-200"
+                            : "bg-emerald-100 text-emerald-700 border-emerald-200"
+                        }`}
+                      >
+                        {r.level} ({(r.probability * 100).toFixed(1)}%)
+                      </span>
+                    </td>
+                    <td className="p-3.5 text-xs space-y-1 max-w-md">
+                      {r.top_factors && r.top_factors.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {r.top_factors.slice(0, 2).map((f: any, idx: number) => (
+                            <span
+                              key={idx}
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold border ${
+                                f.direction === "tăng rủi ro"
+                                  ? "bg-rose-50 text-rose-700 border-rose-200"
+                                  : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              }`}
+                            >
+                              <span>{f.direction === "tăng rủi ro" ? "▲" : "▼"}</span>
+                              <span>{formatFeatureName(f.feature)}</span>
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400">Không có yếu tố nổi bật</span>
+                      )}
+                      <div className="text-slate-500 line-clamp-1">{r.recommendation}</div>
+                    </td>
+                    <td className="p-3.5 text-center text-xs">
+                      {r.actual_is_late === null ? (
+                        <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-medium">
+                          {r.status} (Chưa kết thúc)
                         </span>
-                      </td>
-                      <td className="p-3.5 text-xs space-y-1 max-w-md">
-                        {r.top_factors && r.top_factors.length > 0 ? (
-                          r.top_factors.map((f: any, idx: number) => (
-                            <div key={idx} className="flex items-center gap-1.5">
-                              <span
-                                className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                                  f.direction === "tăng rủi ro"
-                                    ? "bg-rose-50 text-rose-700 border border-rose-200"
-                                    : "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                }`}
-                              >
-                                {f.direction === "tăng rủi ro" ? "▲ Tăng nguy cơ" : "▼ Giảm nguy cơ"}
-                              </span>
-                              <span className="text-slate-700 font-medium">{formatFeatureName(f.feature)}</span>
-                            </div>
-                          ))
-                        ) : (
-                          <span className="text-slate-400">Không có yếu tố nổi bật</span>
-                        )}
-                        <div className="text-slate-500 italic pt-0.5">{r.recommendation}</div>
-                      </td>
-                      <td className="p-3.5 text-center text-xs">
-                        {r.actual_is_late === null ? (
-                          <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-medium">
-                            {r.status} (Chưa kết thúc)
-                          </span>
-                        ) : r.actual_is_late ? (
-                          <span className="px-2.5 py-1 rounded bg-rose-100 text-rose-700 font-bold">
-                            Trễ hạn (+{r.delay_days} ngày)
-                          </span>
-                        ) : (
-                          <span className="px-2.5 py-1 rounded bg-emerald-100 text-emerald-700 font-bold">
-                            Đúng hạn ({r.delay_days} ngày)
-                          </span>
-                        )}
-                      </td>
-                      <td className="p-3.5 text-center">
-                        {r.is_correct === null ? (
-                          <span className="text-xs text-slate-400">Đang theo dõi</span>
-                        ) : r.is_correct ? (
-                          <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-                            <Check className="w-3.5 h-3.5" /> Khớp thực tế
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
-                            <XCircle className="w-3.5 h-3.5" /> Lệch nhẹ
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      ) : r.actual_is_late ? (
+                        <span className="px-2.5 py-1 rounded bg-rose-100 text-rose-700 font-bold">
+                          Trễ hạn (+{r.delay_days} ngày)
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-1 rounded bg-emerald-100 text-emerald-700 font-bold">
+                          Đúng hạn ({r.delay_days} ngày)
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-3.5 text-center">
+                      {r.is_correct === null ? (
+                        <span className="text-xs text-slate-400">Đang theo dõi</span>
+                      ) : r.is_correct ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                          <Check className="w-3.5 h-3.5" /> Khớp thực tế
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
+                          <XCircle className="w-3.5 h-3.5" /> Lệch nhẹ
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

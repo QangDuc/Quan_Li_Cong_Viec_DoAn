@@ -31,6 +31,7 @@ export const PlansAndCatalogView: React.FC<Props> = ({
   const [previewRows, setPreviewRows] = useState<any[] | null>(null);
   const [importMsg, setImportMsg] = useState("");
   const [plans, setPlans] = useState<any[]>([]);
+  const [activeSubTab, setActiveSubTab] = useState<"plans" | "norm_table">("plans");
 
   // Form thêm danh mục cấp Trường
   const [newCode, setNewCode] = useState("");
@@ -65,7 +66,27 @@ export const PlansAndCatalogView: React.FC<Props> = ({
   };
 
   const handleDownloadTemplate = async () => {
-    const res = await fetch(`${API_BASE}/reports/plans/template`, {
+    const qs = new URLSearchParams({
+      academic_year: academicYear,
+      ...(selectedLecturerId ? { lecturer_id: String(selectedLecturerId) } : {}),
+    });
+    const res = await fetch(`${API_BASE}/reports/plans/template?${qs.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) {
+      const selLec = lecturers.find((l) => l.id === selectedLecturerId);
+      const code = selLec?.lecturer_code || "GV";
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `KeHoach_CongTac_Nam_${code}_${academicYear.replace("-", "_")}.xlsx`;
+      a.click();
+    }
+  };
+
+  const handleExportSinglePlan = async (plan: any) => {
+    const res = await fetch(`${API_BASE}/reports/plans/${plan.id}/export`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (res.ok) {
@@ -73,7 +94,7 @@ export const PlansAndCatalogView: React.FC<Props> = ({
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "Mau_KeHoach_CongViec_Nam_2026_2027.xlsx";
+      a.download = `KeHoach_Nam_${plan.lecturer_id}_${String(plan.academic_year).replace("-", "_")}.xlsx`;
       a.click();
     }
   };
@@ -205,25 +226,60 @@ export const PlansAndCatalogView: React.FC<Props> = ({
   const isManagerOrAdmin = currentUser?.role !== "lecturer";
 
   return (
-    <div className="space-y-6">
-      {/* PHẦN 1: IMPORT KẾ HOẠCH NĂM */}
+    <div className="space-y-5">
+      {/* THANH CHUYỂN ĐỔI SUB-TAB: TÁCH KẾ HOẠCH NĂM & BẢNG ĐỊNH MỨC GIỜ CHUẨN */}
+      <div className="min-h-[60px] bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveSubTab("plans")}
+            className={`h-9 flex items-center gap-2 px-4 rounded-xl text-xs font-bold border cursor-pointer transition ${
+              activeSubTab === "plans"
+                ? "bg-blue-600 text-white border-blue-600 shadow-xs"
+                : "bg-slate-100 text-slate-700 border-slate-200/80 hover:bg-slate-200"
+            }`}
+          >
+            <FileSpreadsheet className="w-4 h-4 shrink-0" />
+            Kế hoạch Công tác Năm ({plans.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSubTab("norm_table")}
+            className={`h-9 flex items-center gap-2 px-4 rounded-xl text-xs font-bold border cursor-pointer transition ${
+              activeSubTab === "norm_table"
+                ? "bg-blue-600 text-white border-blue-600 shadow-xs"
+                : "bg-slate-100 text-slate-700 border-slate-200/80 hover:bg-slate-200"
+            }`}
+          >
+            <BookOpen className="w-4 h-4 shrink-0" />
+            Định mức Giờ chuẩn &amp; Việc Trường
+          </button>
+        </div>
+        <span className="text-[11px] text-slate-500 hidden sm:inline">
+          Định mức chuẩn: <b className="text-slate-700">270 giờ chuẩn / năm học</b>
+        </span>
+      </div>
+
+      {/* SUB-TAB 1: IMPORT KẾ HOẠCH NĂM */}
+      {activeSubTab === "plans" && (
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-5 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
+              <FileSpreadsheet className="w-5 h-5 text-emerald-600 shrink-0" />
               Nhập Kế hoạch Công việc Năm từ Excel
             </h3>
             <button
               type="button"
               onClick={handleDownloadTemplate}
-              className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-200 cursor-pointer"
+              className="h-9 flex items-center gap-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 bg-emerald-50 px-3 rounded-xl border border-emerald-200 cursor-pointer transition"
+              title="Tải Biểu mẫu Kế hoạch Công tác Năm chính thức"
             >
-              <Download className="w-3.5 h-3.5" /> Tải file Excel mẫu
+              <Download className="w-3.5 h-3.5 shrink-0" /> Tải Biểu mẫu Kế hoạch Chuẩn
             </button>
           </div>
           <p className="text-xs text-slate-500">
-            Nhập danh sách đầu việc kế hoạch năm của giảng viên từ file Excel (`.xlsx`), kiểm tra trước khi lưu và tự động thiết lập lịch nhắc hạn.
+            Tải biểu mẫu kế hoạch chuẩn, điền danh sách công việc năm học của giảng viên và tải lên để hệ thống tự động phân loại và thiết lập lịch nhắc hạn.
           </p>
 
           {importMsg && (
@@ -296,21 +352,45 @@ export const PlansAndCatalogView: React.FC<Props> = ({
 
               {previewRows && (
                 <div className="mt-3 border border-slate-200 rounded-xl overflow-hidden">
-                  <div className="bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700">
-                    Xem trước {previewRows.length} dòng dữ liệu từ file Excel:
+                  <div className="bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 flex items-center justify-between">
+                    <span>Xem trước {previewRows.length} đầu việc từ file Excel:</span>
+                    <span className="text-emerald-700">
+                      Tổng giờ quy đổi:{" "}
+                      {previewRows.reduce((acc, r) => acc + Number(r.conversion_hours || 0), 0).toFixed(1)}h chuẩn
+                    </span>
                   </div>
-                  <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 text-xs">
+                  <div className="max-h-56 overflow-y-auto divide-y divide-slate-100 text-xs">
                     {previewRows.map((r, i) => (
-                      <div key={i} className="p-2.5 flex items-center justify-between">
-                        <div>
-                          <div className="font-semibold text-slate-800">{r.title}</div>
-                          <div className="text-slate-500">
-                            Loại: {r.matched_task_type} • Quy mô: {r.scale}
+                      <div key={i} className="p-2.5 flex items-start justify-between gap-2 hover:bg-slate-50">
+                        <div className="space-y-0.5">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {r.plan_code && (
+                              <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-mono text-[10px] font-bold">
+                                {r.plan_code}
+                              </span>
+                            )}
+                            {r.semester && (
+                              <span className="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 text-[10px] font-bold">
+                                {r.semester}
+                              </span>
+                            )}
+                            <span className="font-semibold text-slate-800">{r.title}</span>
                           </div>
+                          <div className="text-slate-500 text-[11px]">
+                            Loại: <b>{r.matched_task_type}</b> ({r.task_group || "Chuyên môn"}) • {r.scale}
+                            {r.role_mode ? ` • ${r.role_mode}` : ""}
+                          </div>
+                          {r.deliverable && (
+                            <div className="text-[11px] text-emerald-700 truncate max-w-xs">
+                              Minh chứng: {r.deliverable}
+                            </div>
+                          )}
                         </div>
-                        <div className="text-right">
+                        <div className="text-right shrink-0 space-y-0.5">
                           <div className="font-mono font-bold text-blue-700">{r.deadline}</div>
-                          <div className="text-slate-500">{r.priority}</div>
+                          <div className="text-[11px] font-bold text-indigo-700">
+                            {r.conversion_hours ?? 10}h chuẩn • {r.priority}
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -340,9 +420,19 @@ export const PlansAndCatalogView: React.FC<Props> = ({
                       Năm học {p.academic_year}
                     </span>
                   </div>
-                  <span className="text-xs font-semibold text-emerald-700">
-                    Hoàn thành: {p.completed_tasks}/{p.total_tasks} đầu việc kế hoạch
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-emerald-700">
+                      Hoàn thành: {p.completed_tasks}/{p.total_tasks} đầu việc
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleExportSinglePlan(p)}
+                      className="h-8 inline-flex items-center gap-1 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 border border-emerald-600 text-white text-xs font-bold cursor-pointer transition"
+                      title="Xuất bản Kế hoạch Công tác Năm này ra file Excel"
+                    >
+                      <Download className="w-3.5 h-3.5 shrink-0" /> Xuất Excel
+                    </button>
+                  </div>
                 </div>
                 <p className="text-xs text-slate-500">
                   File nguồn: <span className="font-mono text-slate-700">{p.file_name}</span> • Người nhập:{" "}
@@ -353,8 +443,10 @@ export const PlansAndCatalogView: React.FC<Props> = ({
           </div>
         </div>
       </div>
+      )}
 
-      {/* PHẦN 2: DANH MỤC CÔNG VIỆC CẤP TRƯỜNG & BẢNG ĐỊNH MỨC GIỜ CHUẨN QUY ĐỔI */}
+      {/* SUB-TAB 2: DANH MỤC CÔNG VIỆC CẤP TRƯỜNG & BẢNG ĐỊNH MỨC GIỜ CHUẨN QUY ĐỔI */}
+      {activeSubTab === "norm_table" && (
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-5 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
           <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -365,26 +457,39 @@ export const PlansAndCatalogView: React.FC<Props> = ({
             Các nhiệm vụ cấp Trường (coi thi quốc gia, đoàn kiểm định, hội đồng Trường...) được ánh xạ để tính đúng số giờ chuẩn quy đổi theo quyết định của Trường.
           </p>
           <div className="space-y-2.5">
-            {schoolCatalog.map((sc) => (
-              <div
-                key={sc.id}
-                className="p-3 rounded-xl border border-slate-200 flex items-center justify-between hover:bg-slate-50"
-              >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-800 font-mono text-xs font-bold">
-                      {sc.code}
-                    </span>
-                    <span className="font-semibold text-slate-800 text-sm">{sc.name}</span>
+            {schoolCatalog.map((sc) => {
+              const codeLabel = sc.code || sc.catalog_code || `TR-0${sc.id}`;
+              const stdHours = sc.conversion_hours ?? sc.standard_hours ?? 15;
+              const noteText = sc.note || sc.category || "Quyết định quy đổi định mức cấp Trường";
+              const mappedCount = sc.mapped_task_count ?? 1;
+              return (
+                <div
+                  key={sc.id}
+                  className="p-3.5 rounded-xl border border-slate-200 flex items-center justify-between gap-3 hover:bg-slate-50 transition"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="px-2 py-0.5 rounded bg-purple-100 text-purple-800 font-mono text-xs font-bold shrink-0">
+                        {codeLabel}
+                      </span>
+                      <span className="font-semibold text-slate-900 text-sm">{sc.name}</span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {noteText}
+                      {sc.task_type_name ? ` • Liên kết: ${sc.task_type_name}` : ""}
+                    </p>
                   </div>
-                  {sc.note && <p className="text-xs text-slate-500 mt-0.5">{sc.note}</p>}
+                  <div className="text-right shrink-0">
+                    <div className="font-extrabold text-indigo-700 text-sm">
+                      {stdHours} giờ chuẩn
+                    </div>
+                    <div className="text-[11px] font-medium text-emerald-700 mt-0.5">
+                      Đã ánh xạ: {mappedCount} việc
+                    </div>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <div className="font-bold text-indigo-700 text-sm">{sc.conversion_hours} giờ chuẩn</div>
-                  <div className="text-[11px] text-slate-500">Đã ánh xạ: {sc.mapped_task_count || 0} việc</div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {isManagerOrAdmin && (
@@ -434,7 +539,7 @@ export const PlansAndCatalogView: React.FC<Props> = ({
             <div>
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <BookOpen className="w-5 h-5 text-blue-600" />
-                Bảng Định mức Giờ chuẩn Quy đổi của Khoa CNTT (35 danh mục)
+                Bảng Định mức Giờ chuẩn Quy đổi của Khoa CNTT
               </h3>
               <p className="text-xs text-slate-500 mt-1">
                 Thiết lập theo khung <b>Thông tư 20/2020/TT-BGDĐT</b> của Bộ GD&amp;ĐT (định mức 270 giờ chuẩn giảng dạy / 1.760 giờ hành chính/năm học).{" "}
@@ -604,6 +709,7 @@ export const PlansAndCatalogView: React.FC<Props> = ({
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 };

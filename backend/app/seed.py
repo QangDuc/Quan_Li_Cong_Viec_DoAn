@@ -26,6 +26,7 @@ from app.models import (
     ST_NEW, ST_DOING, ST_DONE, EXT_PENDING, EXT_APPROVED
 )
 from app.security import hash_password
+from app.rbac import sync_all_users_rbac
 
 CATALOG_PATH = os.path.join(os.path.dirname(__file__), "seed_data", "catalog.json")
 
@@ -44,7 +45,8 @@ def seed(reset: bool = False):
     db = SessionLocal()
     try:
         if db.query(Department).first():
-            print("CSDL đã có dữ liệu mẫu, bỏ qua seed.")
+            sync_all_users_rbac(db)
+            print("CSDL đã có dữ liệu mẫu, đã đồng bộ bảng phân quyền RBAC.")
             return
 
         with open(CATALOG_PATH, "r", encoding="utf-8") as f:
@@ -265,6 +267,9 @@ def seed(reset: bool = False):
                     student_count=info[7],
                     supervised_student_count=info[8]
                 ))
+
+        print("5b. Seed RBAC Roles, Permissions, Role-Permissions & User Permission Scopes...")
+        sync_all_users_rbac(db)
 
         print("6. Seed Hồ sơ công việc 1 năm (2026-2027) cho ThS. Nguyễn Minh Khoa (gv_k01_1)...")
         gv1 = users_by_username["gv_k01_1"]
@@ -847,7 +852,7 @@ def seed(reset: bool = False):
                 top_factors=json.dumps(spec["ml_factors"], ensure_ascii=False),
                 recommendation=spec["ml_rec"],
                 low_confidence=False,
-                model_version="2026-10-10T01:49:15",
+                model_version="TabPFN v2 (9.2.0 • 4 túi ngữ cảnh, v0001)",
                 latency_ms=34,
                 created_at=spec["assigned_at"],
                 predicted_at=spec["assigned_at"],
@@ -928,7 +933,7 @@ def seed(reset: bool = False):
                 top_factors=json.dumps([{"feature": "hist_late_rate_smooth", "direction": "giảm rủi ro", "delta_logit": -0.55}], ensure_ascii=False),
                 recommendation="Rủi ro thấp: tiếp tục theo dõi định kỳ.",
                 low_confidence=False,
-                model_version="2026-10-10T01:49:15",
+                model_version="TabPFN v2 (9.2.0 • 4 túi ngữ cảnh, v0001)",
                 latency_ms=28,
                 created_at=ass_dt,
                 predicted_at=ass_dt,
@@ -982,7 +987,7 @@ def seed(reset: bool = False):
                 top_factors=json.dumps([{"feature": "is_new_lecturer", "direction": "tăng rủi ro", "delta_logit": 0.31}], ensure_ascii=False),
                 recommendation="Rủi ro thấp: tiếp tục theo dõi định kỳ. Lưu ý: giảng viên có ít lịch sử (<5 việc), dự đoán có độ không chắc chắn cao.",
                 low_confidence=True,
-                model_version="2026-10-10T01:49:15",
+                model_version="TabPFN v2 (9.2.0 • 4 túi ngữ cảnh, v0001)",
                 latency_ms=29,
                 created_at=ass_dt,
                 predicted_at=ass_dt,
@@ -1007,14 +1012,14 @@ def seed(reset: bool = False):
             dependency_count=2,
             require_external_input=True,
             require_approval=True,
-            assigned_at=datetime.combine(today - timedelta(days=10), datetime.min.time()),
+            assigned_at=today - timedelta(days=10),
             original_deadline=today + timedelta(days=12),
             current_deadline=today + timedelta(days=12),
             status=ST_DOING,
             created_by=dean.id,
             reviewer_id=tbm1.id,
             lead_lecturer_id=gv1.id,
-            created_at=datetime.combine(today - timedelta(days=10), datetime.min.time())
+            created_at=today - timedelta(days=10)
         )
         db.add(grp_task)
         db.flush()
@@ -1049,10 +1054,10 @@ def seed(reset: bool = False):
                 top_factors=json.dumps([{"feature": "accreditation_flag", "direction": "tăng rủi ro", "delta_logit": 0.38}], ensure_ascii=False),
                 recommendation="Công việc nhóm kiểm định: Trưởng nhóm cần đôn đốc tiến độ các thành viên hàng tuần.",
                 low_confidence=(m_user.id == gv3.id),
-                model_version="2026-10-10T01:49:15",
+                model_version="TabPFN v2 (9.2.0 • 4 túi ngữ cảnh, v0001)",
                 latency_ms=30,
-                created_at=datetime.combine(today - timedelta(days=10), datetime.min.time()),
-                predicted_at=datetime.combine(today - timedelta(days=10), datetime.min.time()),
+                created_at=today - timedelta(days=10),
+                predicted_at=today - timedelta(days=10),
             ))
 
         # --- Seed Công việc cho tất cả các Giảng viên còn lại (K02, K03, K04) để mỗi GV đăng nhập đều có việc ---
@@ -1120,7 +1125,7 @@ def seed(reset: bool = False):
                     top_factors=json.dumps([{"feature": "lead_vs_expected_ratio", "direction": "tăng rủi ro", "delta_logit": 0.41}], ensure_ascii=False),
                     recommendation="Theo dõi sát tiến độ thực hiện." if (is_late_sample or is_overdue_open) else "Tiến độ bình thường.",
                     low_confidence=False,
-                    model_version="2026-10-10T01:49:15",
+                    model_version="TabPFN v2 (9.2.0 • 4 túi ngữ cảnh, v0001)",
                     latency_ms=25,
                     created_at=ass_d,
                     predicted_at=ass_d,
