@@ -1,4 +1,4 @@
-"""
+﻿"""
 Dịch vụ Machine Learning suy luận độc lập (FastAPI, cổng 8001) — Phiên bản V4 (TabPFN v2 + MLOps Registry).
 
 Nạp model/risk_model.joblib (hoặc kho phiên bản model/registry CURRENT = v0001) và dùng đúng bộ mã hóa (encoder),
@@ -12,6 +12,14 @@ danh sách 55/58 đặc trưng, ngưỡng [0.23, 0.52], baseline và các túi n
 """
 import os
 import json
+try:
+    from dotenv import load_dotenv
+    _env_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    _env_file = os.path.join(_env_root, '.env')
+    if os.path.exists(_env_file):
+        load_dotenv(_env_file)
+except Exception:
+    pass
 import time
 import hashlib
 import logging
@@ -137,7 +145,7 @@ def _apply_encoder(enc: dict, X: pd.DataFrame) -> pd.DataFrame:
         if c not in X.columns:
             out[c] = np.nan
         elif c in enc["maps"]:
-            out[c] = X[c].map(lambda v, m=enc["maps"][c]: m.get(str(v), np.nan) if v == v and v is not None else np.nan)
+            out[c] = X[c].map(lambda v, m=enc["maps"][c]: m.get(str(v), np.nan) if pd.notna(v) else np.nan)
         else:
             out[c] = pd.to_numeric(X[c], errors="coerce")
     return out.astype(np.float32)
@@ -219,7 +227,10 @@ class MLModelWrapper:
         if not REGISTRY_DIR:
             return None
         p = os.path.join(REGISTRY_DIR, "CURRENT")
-        return open(p, encoding="utf-8").read().strip() if os.path.exists(p) else None
+        if not os.path.exists(p):
+            return None
+        with open(p, encoding="utf-8") as f:
+            return f.read().strip()
 
     def _bundle_from_registry(self):
         v = self._registry_current()
@@ -318,8 +329,10 @@ class MLModelWrapper:
             try:
                 self.bundle, self.registry_version = self._bundle_from_registry()
             except Exception as e:
-                logger.warning(f"Không nạp được từ registry {REGISTRY_DIR} ({e}), chuyển sang nạp {MODEL_PATH}")
+                logger.warning(f"Không nạp được từ registry {REGISTRY_DIR} ({e})")
+                self.load_error = str(e)
                 self.bundle = None
+                return
 
         if self.bundle is None:
             if not os.path.exists(MODEL_PATH):
@@ -409,11 +422,9 @@ class MLModelWrapper:
         except Exception as e:
             self.bag_clfs = []
             self.engine_type = "unavailable"
-            self.load_error = (
-                f"Không nạp được TabPFN: {type(e).__name__}: {e}. "
-                f"Cài tabpfn và trọng số, hoặc đặt ML_ENGINE=surrogate_hgb cho bản demo (không được đánh giá)."
-            )
+            self.load_error = f"Không nạp được TabPFN: {type(e).__name__}: {e}"
             logger.error(self.load_error)
+            raise
 
     def _load_surrogate(self):
         cat_idx = self.bundle.get("cat_idx") or None
@@ -431,7 +442,8 @@ class MLModelWrapper:
         sur = None
         if os.path.exists(SURROGATE_PATH):
             try:
-                sur = json.load(open(SURROGATE_PATH, encoding="utf-8"))
+                with open(SURROGATE_PATH, encoding="utf-8") as f:
+                    sur = json.load(f)
             except Exception as e:
                 logger.warning(f"Không đọc được {SURROGATE_PATH}: {e}")
         if sur and sur.get("thresholds"):
@@ -807,3 +819,4 @@ def retrain(req: RetrainRequest):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001, reload=False)
+

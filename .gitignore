@@ -30,11 +30,17 @@ playwright_*.png
 *.docx
 *.doc
 *.pdf
-!docs/BAO_CAO_KLTN_CNTT_KLCN184_HOAN_CHINH.docx
+!docs/BAO_CAO_KLTN_CNTT_KLCN184_UNIFIED_UPDATED.docx
 ~$*
 backend/scripts/generated_diagrams/
 backend/scripts/build_graduation_thesis_docx.py
 backend/scripts/update_docx_thesis.py
+
+# Runtime uploaded evidence files
+backend/uploads/evidence/*.png
+backend/uploads/evidence/*.jpg
+backend/uploads/evidence/*.jpeg
+backend/uploads/evidence/*.pdf
 
 # IDE files
 .vscode/

@@ -130,7 +130,7 @@ Hệ thống tự động khởi chạy 4 container:
 ---
 
 ## 5. Tài khoản Đăng nhập Kiểm thử (Hỗ trợ chọn nhanh trên màn hình Đăng nhập)
-
+  
 | Tài khoản | Mật khẩu | Vai trò | Họ tên & Đơn vị | Chức năng kiểm thử chính |
 |---|---|---|---|---|
 | `truongkhoa` | `Manager@123` | Trưởng Khoa (`manager`) | TS. Nguyễn Văn Lễ (Khoa CNTT) | Giao việc mới kèm gợi ý ML, duyệt gia hạn, sửa định mức giờ chuẩn, xem thống kê toàn Khoa & hồ sơ 1 năm của mọi giảng viên |

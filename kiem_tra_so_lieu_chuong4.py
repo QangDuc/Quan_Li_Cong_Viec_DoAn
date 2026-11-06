@@ -151,9 +151,10 @@ bc = load_json("model", "bao_cao_muc_canh_bao.json")
 for k in ("thresholds", "test", "alert_levels", "target_check", "segments"):
     results.append((bc.get(k) == ms.get(k), f"bao_cao_muc_canh_bao.json khớp model/metrics.json [{k}]", k))
 
-ref_tm = open(P("training_scripts", "train_model.py"), encoding="utf-8").read()
+ref_tm_path = P("training_scripts", "train_model.py") if os.path.exists(P("training_scripts", "train_model.py")) else P("train_model.py")
+ref_tm = open(ref_tm_path, encoding="utf-8").read()
 ht_tm = open(P("hoc_tiep_mlops", "train_model.py"), encoding="utf-8").read()
-results.append((ref_tm == ht_tm, "hoc_tiep_mlops/train_model.py khớp training_scripts/train_model.py", "train_model.py"))
+results.append((ref_tm == ht_tm, "hoc_tiep_mlops/train_model.py khớp train_model.py", "train_model.py"))
 
 for nb_name in ("Colab_RETRAIN_v2.ipynb", "Colab_RETRAIN_v2_seed43.ipynb", "Colab_RETRAIN_v2_seed44.ipynb"):
     nb = load_json("colab_notebooks", nb_name)

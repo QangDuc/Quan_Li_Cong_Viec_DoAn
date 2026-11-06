@@ -1,6 +1,14 @@
 """Cấu hình đọc từ biến môi trường (xem .env.example ở thư mục gốc)."""
 import os
 from urllib.parse import quote_plus
+try:
+    from dotenv import load_dotenv
+    _env_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    _env_file = os.path.join(_env_root, '.env')
+    if os.path.exists(_env_file):
+        load_dotenv(_env_file)
+except Exception:
+    pass
 
 
 def _env(key, default=None):

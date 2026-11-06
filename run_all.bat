@@ -9,7 +9,7 @@ echo [1/2] Khoi dong Backend va ML...
 call "%~dp0run_backend.bat"
 
 echo [2/2] Khoi dong Frontend UI (Port 5173)...
-start "Frontend UI (Port 5173)" cmd /k "cd /d ""%~dp0frontend"" && npm run dev"
+start "Frontend UI (Port 5173)" /D "%~dp0frontend" cmd /k "npm run dev"
 
 echo.
 echo ===================================================

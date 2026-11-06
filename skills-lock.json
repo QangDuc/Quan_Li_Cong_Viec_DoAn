@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "academic-paper": {
+      "source": "imbad0202/academic-research-skills",
+      "sourceType": "github",
+      "skillPath": "academic-paper/SKILL.md",
+      "computedHash": "624c93396626b88e0a6641627ff54f8cd9f031a9045bae5d047bba3b7f9f57a2"
+    },
+    "docx": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/docx/SKILL.md",
+      "computedHash": "3b8f8cf1ca7a427607c78312655e95e21b5f8f2b06a1aad4dc5554cc90eb095c"
+    },
+    "find-skills": {
+      "source": "vercel-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/find-skills/SKILL.md",
+      "computedHash": "913b9d37d0d54047dd65222bb8c67b2bf04e3cb87dcad1729068d7a8b2c8c396"
+    }
+  }
+}

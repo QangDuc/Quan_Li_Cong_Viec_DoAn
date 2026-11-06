@@ -34,8 +34,8 @@ jobs:
 
       - name: Chạy Kiểm thử MLOps Học tiếp (11 ca test đơn vị)
         run: |
-          if [ -f hoc_tiep_muc1/tests/test_hoc_tiep.py ]; then
-            PYTHONPATH=hoc_tiep_muc1 python hoc_tiep_muc1/tests/test_hoc_tiep.py
+          if [ -f hoc_tiep_mlops/tests/test_hoc_tiep.py ]; then
+            PYTHONPATH=hoc_tiep_mlops python hoc_tiep_mlops/tests/test_hoc_tiep.py
           elif [ -f tests/test_hoc_tiep.py ]; then
             python tests/test_hoc_tiep.py
           else

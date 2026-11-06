@@ -15,7 +15,13 @@ class TabPFNClassifier:
     def predict_proba(self, X): return self.m.predict_proba(np.asarray(X, float))
 ''')
 open(f"{STUB_DIR}/torch/__init__.py", "w").write("class cuda:\n    @staticmethod\n    def is_available(): return False\n")
-sys.path[:0] = [STUB_DIR, ROOT, HERE, os.path.join(BO, "service"), os.path.join(BO, "training_scripts")]
+sys.path[:0] = [
+    STUB_DIR, ROOT, HERE,
+    os.path.join(BO, "backend"),
+    os.path.join(BO, "backend", "app"),
+    os.path.join(BO, "service"),
+    os.path.join(BO, "training_scripts"),
+]
 warnings.filterwarnings("ignore")
 import joblib, numpy as np, pandas as pd
 from test_hoc_tiep import make, CFG
@@ -56,7 +62,7 @@ def t_import_service_bundle_and_service_reload():
     from fastapi.testclient import TestClient
     c = TestClient(ml_service.app); h = c.get("/health").json()
     assert h["status"] == "ok" and h["registry_version"] == v1 and h["thresholds"] == [0.23, 0.52], h
-    req = json.load(open(os.path.join(BO, "service", "sample_requests.json"), encoding="utf-8"))[0]["features"]
+    req = json.load(open(os.path.join(BO, "backend", "sample_requests.json") if os.path.exists(os.path.join(BO, "backend", "sample_requests.json")) else os.path.join(BO, "service", "sample_requests.json"), encoding="utf-8"))[0]["features"]
     assert c.post("/predict", json={"features": req, "explain": False}).status_code == 200
     # nâng cấp: phiên bản mới có ngưỡng khác -> dịch vụ tự nạp lại ở lần gọi sau
     b = reg.load(v1); b["thresholds"] = [0.10, 0.30]
@@ -109,7 +115,7 @@ def t_lock_prevents_concurrent_jobs():
 def t_hook_logs_prediction_and_outcome():
     import hoc_tiep_hook
     db = os.path.join(tempfile.mkdtemp(), "fb.db"); os.environ.update(HOC_TIEP_DB=db, HOC_TIEP_PATH=ROOT)
-    f = json.load(open(os.path.join(BO, "service", "sample_requests.json"), encoding="utf-8"))[0]["features"]
+    f = json.load(open(os.path.join(BO, "backend", "sample_requests.json") if os.path.exists(os.path.join(BO, "backend", "sample_requests.json")) else os.path.join(BO, "service", "sample_requests.json"), encoding="utf-8"))[0]["features"]
     assert hoc_tiep_hook.log_prediction(101, 7, f, "2026-03-02 09:00:00", 0.31, "Trung bình", "TabPFN v2")
     assert not hoc_tiep_hook.log_prediction(101, 7, f, "2026-03-05", 0.9, "Cao", "x") or True      # lần 2 bị bỏ (giữ dự đoán đầu) nhưng không lỗi
     assert hoc_tiep_hook.record_outcome(101, 7, "2026-03-20", True)
