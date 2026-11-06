@@ -1,4 +1,4 @@
-﻿task_id,lecturer_id,faculty,assigned_date,y,risk_probability,risk_uncertainty
+task_id,lecturer_id,faculty,assigned_date,y,risk_probability,risk_uncertainty
 T044798,GV269,K03,2027-08-19,0,0.22867,0.00751
 T040539,GV242,K06,2027-08-19,1,0.37359,0.03579
 T035063,GV260,K06,2027-08-19,0,0.04481,0.00698

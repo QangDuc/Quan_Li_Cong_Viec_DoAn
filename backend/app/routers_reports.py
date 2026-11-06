@@ -1471,7 +1471,7 @@ def export_late_excel(
         "Mã Công việc", "Tên Công việc", "Loại Công việc", "Mức ưu tiên",
         "Người giao việc", "Người kiểm tra tiến độ",
         "Ngày giao", "Hạn chót gốc", "Hạn chót hiện tại", "Ngày hoàn thành",
-        "Tiến độ (%)", "Phân loại trễ hạn", "Số ngày trễ (ngày)", "Minh chứng kết quả"
+        "Tiến độ (%)", "Phân loại trễ hạn", "Số ngày trễ (ngày)"
     ]
     thin_border = _style_worksheet(
         ws_detail,
@@ -1518,8 +1518,7 @@ def export_late_excel(
             comp_str,
             a.progress_pct,
             late_type,
-            delay_d,
-            a.latest_evidence_name or "Chưa nộp minh chứng"
+            delay_d
         ])
 
     _autofit_columns(ws_detail, thin_border)

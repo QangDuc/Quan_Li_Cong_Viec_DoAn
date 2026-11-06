@@ -1,4 +1,4 @@
-﻿column,role,description
+column,role,description
 task_id,ID/thời gian (không dùng làm đặc trưng),
 lecturer_id,ID/thời gian (không dùng làm đặc trưng),
 faculty,ID/thời gian (không dùng làm đặc trưng),"Mã Khoa (dùng để chia nhóm đánh giá, không phải đặc trưng)"

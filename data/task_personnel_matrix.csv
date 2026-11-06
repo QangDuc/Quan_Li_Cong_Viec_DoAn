@@ -1,4 +1,4 @@
-﻿lecturer_id,task_type,n_tasks,n_late,late_rate,late_rate_smooth,department,dept_n,dept_late,dept_late_rate_smooth,key_task
+lecturer_id,task_type,n_tasks,n_late,late_rate,late_rate_smooth,department,dept_n,dept_late,dept_late_rate_smooth,key_task
 GV001,Chuẩn bị bài giảng/cập nhật slide,12,1,0.08333333333333333,0.10666666666666667,K02 - Mạng máy tính,98,24,0.2435643564356436,task_type
 GV001,Chuẩn bị bài thực hành/lab CNTT,15,4,0.26666666666666666,0.25555555555555554,K02 - Mạng máy tính,134,30,0.22335766423357664,task_type
 GV001,Chuẩn bị tiếp đoàn đánh giá,1,0,0.0,0.15000000000000002,K02 - Mạng máy tính,18,3,0.17142857142857143,task_type

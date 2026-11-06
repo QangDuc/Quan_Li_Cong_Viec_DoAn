@@ -10,13 +10,18 @@ import {
   FileText,
   Users,
   AlertCircle,
-  Send,
-  ShieldAlert,
+  ShieldCheck,
+  UserCheck,
   Eye,
   BellRing,
 } from "lucide-react";
 
 import { API_BASE } from "../types";
+import {
+  calculateProjectProgressFromMembers,
+  evaluateTaskRoleAndVisibility,
+  filterTasksByRoleAndDepartment,
+} from "../rbacWorkflow";
 
 const BACKEND_ORIGIN = API_BASE.replace(/\/api$/, "");
 
@@ -40,7 +45,6 @@ export const TasksAndExtensionsView: React.FC<Props> = ({
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [search, setSearch] = useState<string>("");
   const [extensions, setExtensions] = useState<any[]>([]);
-  const [showRuleGuide, setShowRuleGuide] = useState<boolean>(false);
   const [actionMsg, setActionMsg] = useState<{ type: "ok" | "err"; text: string } | null>(
     null
   );
@@ -86,6 +90,24 @@ export const TasksAndExtensionsView: React.FC<Props> = ({
 
   // Modal 5: Chi tiết & Nhật ký tiến độ
   const [detailData, setDetailData] = useState<any | null>(null);
+
+  const deptHeadDeptId = currentUser?.department_id
+    ? Number(currentUser.department_id)
+    : null;
+
+  // Modal 6: Trưởng nhóm (Người phụ trách chính) phê duyệt tiến độ thành viên & gửi hệ thống tự tính % dự án
+  const [leadApproveTask, setLeadApproveTask] = useState<any | null>(null);
+  const [leadMemberDecisions, setLeadMemberDecisions] = useState<
+    Record<number, { approval_status: string; review_note: string }>
+  >({});
+  const [leadDecisionNote, setLeadDecisionNote] = useState<string>("");
+
+  // Modal 7: Người kiểm tra quan sát tiến độ từng thành viên & phê duyệt quyết định của Trưởng nhóm
+  const [reviewerApproveTask, setReviewerApproveTask] = useState<any | null>(null);
+  const [reviewerDecisionStatus, setReviewerDecisionStatus] = useState<string>(
+    "Đã phê duyệt quyết định Trưởng nhóm"
+  );
+  const [reviewerDecisionNote, setReviewerDecisionNote] = useState<string>("");
 
   useEffect(() => {
     fetchExtensions();
@@ -142,30 +164,35 @@ export const TasksAndExtensionsView: React.FC<Props> = ({
     }
   };
 
-  // Kiểm tra quyền trên từng công việc
+  // Kiểm tra quyền trên từng công việc theo mô hình RBAC 5 cấp & Phạm vi Bộ môn
   const getTaskRoleInfo = (t: any) => {
     const isGroup =
       t.assignment_mode === "Group" || (t.assignees?.length || 0) >= 2;
-    const myAssign = t.assignees?.find(
-      (a: any) => a.lecturer_id === currentUser?.id
+    const evalRole = evaluateTaskRoleAndVisibility(
+      currentUser,
+      t,
+      "AUTO",
+      deptHeadDeptId
     );
+    const myAssign =
+      evalRole.targetSelfAssignee ||
+      t.assignees?.find((a: any) => a.lecturer_id === currentUser?.id);
     const isUserLead =
-      t.lead_lecturer_id === currentUser?.id || Boolean(myAssign?.is_lead);
+      evalRole.effectiveRole === "GROUP_LEAD" ||
+      t.lead_lecturer_id === currentUser?.id ||
+      Boolean(myAssign?.is_lead);
     const isSingleAssignee = !isGroup && Boolean(myAssign);
-    // CHỈ Trưởng nhóm (việc nhóm) hoặc Giảng viên được giao (việc cá nhân) mới được nộp minh chứng chính thức
-    const canSubmitOfficialEvidence = isGroup ? isUserLead : isSingleAssignee;
-    // Thành viên thường trong nhóm -> gửi minh chứng lên Trưởng nhóm trước
-    const isRegularGroupMember = isGroup && Boolean(myAssign) && !isUserLead;
-    // Người kiểm tra hoặc Trưởng nhóm hoặc Quản lý -> cập nhật tiến độ (%) từng thành viên & báo thiếu sót
+    const canSubmitOfficialEvidence = evalRole.canSelfUpdateProgress;
+    const isRegularGroupMember = isGroup && evalRole.effectiveRole === "MEMBER";
     const isReviewerOrManager =
-      currentUser?.role === "manager" ||
-      currentUser?.role === "admin" ||
-      t.reviewer_id === currentUser?.id ||
-      t.created_by === currentUser?.id;
-    const canUpdateProgress =
-      isUserLead || isSingleAssignee || isReviewerOrManager;
-    const canSendFeedback = isUserLead || isReviewerOrManager;
-    const canDelegate = isGroup && (isUserLead || isReviewerOrManager);
+      evalRole.effectiveRole === "REVIEWER" ||
+      evalRole.effectiveRole === "DEPT_HEAD" ||
+      evalRole.effectiveRole === "DEAN";
+    const canUpdateProgress = evalRole.canSelfUpdateProgress;
+    const canSendFeedback =
+      evalRole.effectiveRole === "GROUP_LEAD" ||
+      evalRole.effectiveRole === "REVIEWER";
+    const canDelegate = isGroup && evalRole.effectiveRole === "GROUP_LEAD";
 
     return {
       isGroup,
@@ -178,38 +205,131 @@ export const TasksAndExtensionsView: React.FC<Props> = ({
       canUpdateProgress,
       canSendFeedback,
       canDelegate,
+      ...evalRole,
     };
   };
 
   const openProgressModal = (t: any) => {
     setProgTask(t);
-    const myAssign = t.assignees?.find(
-      (a: any) => a.lecturer_id === currentUser?.id
-    );
-    const target = myAssign || t.assignees?.[0];
+    const roleInfo = getTaskRoleInfo(t);
+    const target = roleInfo.targetSelfAssignee || t.assignees?.[0];
     setProgLecturerId(target ? target.lecturer_id : currentUser?.id);
     setProgPct(target?.progress_pct ?? 50);
     setProgNote("");
-    setEvidenceFileName("");
-    setEvidenceFileUrl("");
+    setEvidenceFileName(target?.latest_evidence_name || "");
+    setEvidenceFileUrl(target?.latest_evidence_url || "");
+  };
+
+  const openLeadApproveModal = (t: any) => {
+    setLeadApproveTask(t);
+    const initMap: Record<number, { approval_status: string; review_note: string }> = {};
+    (t.assignees || []).forEach((a: any) => {
+      initMap[a.lecturer_id] = {
+        approval_status:
+          a.lead_approval_status === "Yêu cầu chỉnh sửa"
+            ? "Yêu cầu chỉnh sửa"
+            : "Trưởng nhóm đã duyệt",
+        review_note: "",
+      };
+    });
+    setLeadMemberDecisions(initMap);
+    const autoPct = calculateProjectProgressFromMembers(t.assignees, t.progress_pct);
+    setLeadDecisionNote(
+      `Đã rà soát và phê duyệt kết quả thực hiện của các thành viên trong nhóm (Tiến độ dự án: ${autoPct}%).`
+    );
+  };
+
+  const handleSaveLeadApproval = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!leadApproveTask) return;
+    const member_approvals = (leadApproveTask.assignees || []).map((a: any) => ({
+      lecturer_id: a.lecturer_id,
+      approval_status:
+        leadMemberDecisions[a.lecturer_id]?.approval_status || "Trưởng nhóm đã duyệt",
+      review_note: leadMemberDecisions[a.lecturer_id]?.review_note || "",
+    }));
+    const res = await fetch(`${API_BASE}/tasks/${leadApproveTask.id}/lead-approve`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        member_approvals,
+        submit_to_reviewer: true,
+        lead_decision_note: leadDecisionNote,
+      }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setActionMsg({
+        type: "ok",
+        text: data.message || "Đã phê duyệt tiến độ các thành viên trong nhóm.",
+      });
+      setLeadApproveTask(null);
+      onRefresh();
+    } else {
+      setActionMsg({
+        type: "err",
+        text: data.detail || "Không thể phê duyệt tiến độ nhóm",
+      });
+    }
+  };
+
+  const openReviewerApproveModal = (t: any) => {
+    setReviewerApproveTask(t);
+    setReviewerDecisionStatus("Đã phê duyệt quyết định Trưởng nhóm");
+    const autoPct = calculateProjectProgressFromMembers(t.assignees, t.progress_pct);
+    setReviewerDecisionNote(
+      `Đã kiểm tra kết quả của các thành viên và thống nhất với quyết định phê duyệt của Trưởng nhóm (${autoPct}%).`
+    );
+  };
+
+  const handleSaveReviewerApproval = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reviewerApproveTask) return;
+    const res = await fetch(
+      `${API_BASE}/tasks/${reviewerApproveTask.id}/reviewer-approve`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          approval_status: reviewerDecisionStatus,
+          reviewer_decision_note: reviewerDecisionNote,
+        }),
+      }
+    );
+    const data = await res.json();
+    if (res.ok) {
+      setActionMsg({
+        type: "ok",
+        text:
+          data.message ||
+          "Người kiểm tra đã phê duyệt quyết định của Trưởng nhóm thành công!",
+      });
+      setReviewerApproveTask(null);
+      onRefresh();
+    } else {
+      setActionMsg({
+        type: "err",
+        text: data.detail || "Không thể phê duyệt quyết định Trưởng nhóm",
+      });
+    }
   };
 
   const handleSaveProgress = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!progTask) return;
-    const roleInfo = getTaskRoleInfo(progTask);
 
     const payload: any = {
       progress_pct: progPct,
       note: progNote,
       lecturer_id: progLecturerId,
-      // Chỉ gửi file minh chứng nếu tài khoản hiện tại là Trưởng nhóm (hoặc người nhận việc cá nhân)
-      evidence_file_name: roleInfo.canSubmitOfficialEvidence
-        ? evidenceFileName || null
-        : null,
-      evidence_file_url: roleInfo.canSubmitOfficialEvidence
-        ? evidenceFileUrl || null
-        : null,
+      evidence_file_name: evidenceFileName || null,
+      evidence_file_url: evidenceFileUrl || null,
     };
 
     const res = await fetch(`${API_BASE}/tasks/${progTask.id}/progress`, {
@@ -224,11 +344,9 @@ export const TasksAndExtensionsView: React.FC<Props> = ({
     if (res.ok) {
       setActionMsg({
         type: "ok",
-        text: `Đã cập nhật tiến độ công việc ${progTask.code} lên ${progPct}%${
-          payload.evidence_file_name
-            ? ` (Minh chứng Trưởng nhóm: ${payload.evidence_file_name})`
-            : ""
-        }`,
+        text:
+          data.message ||
+          `Đã cập nhật tiến độ đạt ${progPct}%.`,
       });
       setProgTask(null);
       setProgNote("");
@@ -239,16 +357,6 @@ export const TasksAndExtensionsView: React.FC<Props> = ({
         text: data.detail || "Không thể cập nhật tiến độ",
       });
     }
-  };
-
-  const openMemberEvidenceModal = (t: any) => {
-    setMemberEvTask(t);
-    const myAssign = t.assignees?.find(
-      (a: any) => a.lecturer_id === currentUser?.id
-    );
-    setMemberEvNote("");
-    setMemberEvFileName(myAssign?.latest_evidence_name || "");
-    setMemberEvFileUrl(myAssign?.latest_evidence_url || "");
   };
 
   const handleSubmitMemberEvidence = async (e: React.FormEvent) => {
@@ -423,6 +531,11 @@ export const TasksAndExtensionsView: React.FC<Props> = ({
     }
   };
 
+  const isActingAsDeptHead =
+    currentUser?.role === "manager" &&
+    currentUser?.department_id !== null &&
+    currentUser?.department_id !== undefined;
+
   const handleReviewExtension = async (extId: number, statusDecision: string) => {
     const res = await fetch(`${API_BASE}/tasks/extensions/${extId}/review`, {
       method: "PUT",
@@ -432,6 +545,7 @@ export const TasksAndExtensionsView: React.FC<Props> = ({
       },
       body: JSON.stringify({
         status: statusDecision,
+        acting_dept_head_department_id: isActingAsDeptHead ? deptHeadDeptId : null,
         review_note:
           statusDecision === "Đã duyệt"
             ? "Đồng ý gia hạn và cập nhật lại hạn hoàn thành"
@@ -512,16 +626,30 @@ export const TasksAndExtensionsView: React.FC<Props> = ({
   const isGroupTask = (t: any) =>
     t.assignment_mode === "Group" || (t.assignees?.length || 0) >= 2;
 
-  const countAll = tasks.length;
-  const countGroup = tasks.filter(isGroupTask).length;
-  const countDoing = tasks.filter(
+  // Lọc công việc & gia hạn theo phạm vi Bộ môn nếu đang ở vai trò Trưởng Bộ môn (DEPT_HEAD)
+  const roleScopedTasks = filterTasksByRoleAndDepartment(
+    tasks,
+    currentUser,
+    "AUTO",
+    deptHeadDeptId
+  );
+
+  const scopedExtensions = isActingAsDeptHead
+    ? extensions.filter(
+        (e) => Number(e.department_id || 1) === Number(deptHeadDeptId)
+      )
+    : extensions;
+
+  const countAll = roleScopedTasks.length;
+  const countGroup = roleScopedTasks.filter(isGroupTask).length;
+  const countDoing = roleScopedTasks.filter(
     (t) => t.status === "Đang thực hiện" || t.status === "Mới giao"
   ).length;
-  const countDone = tasks.filter((t) => t.status === "Hoàn thành").length;
-  const countLate = tasks.filter(isTaskLateOrOverdue).length;
-  const pendingExtCount = extensions.filter((e) => e.status === "Chờ duyệt").length;
+  const countDone = roleScopedTasks.filter((t) => t.status === "Hoàn thành").length;
+  const countLate = roleScopedTasks.filter(isTaskLateOrOverdue).length;
+  const pendingExtCount = scopedExtensions.filter((e) => e.status === "Chờ duyệt").length;
 
-  const filteredTasks = tasks.filter((t) => {
+  const filteredTasks = roleScopedTasks.filter((t) => {
     if (statusFilter === "GROUP") {
       if (!isGroupTask(t)) return false;
     } else if (statusFilter === "DOING") {
@@ -545,65 +673,57 @@ export const TasksAndExtensionsView: React.FC<Props> = ({
 
   return (
     <div className="space-y-4">
-      {/* THANH CÔNG CỤ TRỰC QUAN & BỘ LỌC NHANH (CỐ ĐỊNH CHIỀU CAO CHỐNG NHẢY BỐ CỤC) */}
-      <div className="min-h-[60px] flex flex-wrap items-center justify-between gap-2.5 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setSubView("tasks")}
-            className={`h-9 flex items-center gap-2 px-3.5 rounded-xl text-xs font-bold border cursor-pointer transition ${
-              subView === "tasks"
-                ? "bg-blue-600 text-white border-blue-600 shadow-xs"
-                : "bg-slate-100 text-slate-700 border-slate-200/80 hover:bg-slate-200"
-            }`}
-          >
-            <CheckSquare className="w-4 h-4 shrink-0" />
-            Công việc ({countAll})
-          </button>
+      {/* THANH ĐIỀU HƯỚNG VIEW & BỘ LỌC CÔNG VIỆC CHỐNG NHẢY BỐ CỤC */}
+      <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs space-y-3">
+        {/* HÀNG 1: CHUYỂN ĐỔI CHẾ ĐỘ VIEW (CÔNG VIỆC / DUYỆT GIA HẠN / DS TRỄ) */}
+        <div className="flex flex-wrap items-center justify-between gap-2.5 pb-2.5 border-b border-slate-100">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSubView("tasks")}
+              className={`h-9 flex items-center gap-2 px-3.5 rounded-xl text-xs font-bold border cursor-pointer transition ${
+                subView === "tasks"
+                  ? "bg-blue-600 text-white border-blue-600 shadow-xs"
+                  : "bg-slate-100 text-slate-700 border-slate-200/80 hover:bg-slate-200"
+              }`}
+            >
+              <CheckSquare className="w-4 h-4 shrink-0" />
+              Công việc ({countAll})
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setSubView("extensions")}
-            className={`h-9 flex items-center gap-2 px-3.5 rounded-xl text-xs font-bold border cursor-pointer transition ${
-              subView === "extensions"
-                ? "bg-blue-600 text-white border-blue-600 shadow-xs"
-                : "bg-slate-100 text-slate-700 border-slate-200/80 hover:bg-slate-200"
-            }`}
-          >
-            <CalendarPlus className="w-4 h-4 shrink-0" />
-            Duyệt Gia hạn ({extensions.length})
-            {pendingExtCount > 0 && (
-              <span className="px-2 py-0.5 text-[10px] rounded-full bg-rose-500 text-white font-bold">
-                {pendingExtCount} chờ
-              </span>
+            <button
+              type="button"
+              onClick={() => setSubView("extensions")}
+              className={`h-9 flex items-center gap-2 px-3.5 rounded-xl text-xs font-bold border cursor-pointer transition ${
+                subView === "extensions"
+                  ? "bg-blue-600 text-white border-blue-600 shadow-xs"
+                  : "bg-slate-100 text-slate-700 border-slate-200/80 hover:bg-slate-200"
+              }`}
+            >
+              <CalendarPlus className="w-4 h-4 shrink-0" />
+              Duyệt Gia hạn ({scopedExtensions.length})
+              {pendingExtCount > 0 && (
+                <span className="px-2 py-0.5 text-[10px] rounded-full bg-rose-500 text-white font-bold">
+                  {pendingExtCount} chờ
+                </span>
+              )}
+            </button>
+
+            {currentUser?.role !== "lecturer" && countLate > 0 && (
+              <button
+                type="button"
+                onClick={handleExportLateExcel}
+                title="Xuất danh sách các công việc đang trễ hạn ra Excel"
+                className="h-9 flex items-center gap-1.5 px-2.5 rounded-xl text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 cursor-pointer transition"
+              >
+                <FileDown className="w-3.5 h-3.5 shrink-0" />
+                DS Trễ ({countLate})
+              </button>
             )}
-          </button>
-
-          {subView === "tasks" && (
-            <button
-              type="button"
-              onClick={() => setShowRuleGuide((v) => !v)}
-              className="h-9 flex items-center gap-1.5 px-3 rounded-xl text-xs font-semibold bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 cursor-pointer transition"
-              title="Xem quy trình nộp minh chứng nhóm & cập nhật tiến độ"
-            >
-              <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
-              {showRuleGuide ? "Ẩn quy tắc nhóm ▲" : "ⓘ Quy tắc nhóm ▼"}
-            </button>
-          )}
-
-          {currentUser?.role !== "lecturer" && countLate > 0 && (
-            <button
-              type="button"
-              onClick={handleExportLateExcel}
-              title="Xuất danh sách các công việc đang trễ hạn ra Excel"
-              className="h-9 flex items-center gap-1.5 px-2.5 rounded-xl text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 cursor-pointer transition"
-            >
-              <FileDown className="w-3.5 h-3.5 shrink-0" />
-              DS Trễ ({countLate})
-            </button>
-          )}
+          </div>
         </div>
 
+        {/* HÀNG 2: TÌM KIẾM & BỘ LỌC TRẠNG THÁI CÔNG VIỆC (NẰM SÁT Ô TÌM KIẾM) */}
         {subView === "tasks" ? (
           <div className="flex flex-wrap items-center gap-1.5">
             <div className="relative">
@@ -613,15 +733,15 @@ export const TasksAndExtensionsView: React.FC<Props> = ({
                 placeholder="Tìm mã CV, tên việc, giảng viên..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="h-9 pl-8 pr-3 border border-slate-300 rounded-xl text-xs w-52 outline-none focus:ring-2 focus:ring-blue-500"
+                className="h-9 pl-8 pr-3 border border-slate-300 rounded-xl text-xs w-56 outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
+
             {[
               { key: "ALL", label: `Tất cả (${countAll})` },
               {
                 key: "GROUP",
                 label: `Việc Nhóm (${countGroup})`,
-                isGroupPill: true,
               },
               { key: "DOING", label: `Đang mở (${countDoing})` },
               { key: "Hoàn thành", label: `Hoàn thành (${countDone})` },
@@ -635,17 +755,13 @@ export const TasksAndExtensionsView: React.FC<Props> = ({
                 key={st.key}
                 type="button"
                 onClick={() => setStatusFilter(st.key)}
-                className={`h-9 px-3 rounded-xl text-xs font-semibold border cursor-pointer transition ${
+                className={`h-9 px-3 rounded-xl text-xs font-semibold border cursor-pointer transition whitespace-nowrap ${
                   statusFilter === st.key
                     ? st.isDanger
-                      ? "bg-rose-600 text-white border-rose-600"
-                      : st.isGroupPill
-                      ? "bg-indigo-600 text-white border-indigo-600"
-                      : "bg-slate-900 text-white border-slate-900"
+                      ? "bg-rose-600 text-white border-rose-600 shadow-xs"
+                      : "bg-blue-600 text-white border-blue-600 shadow-xs"
                     : st.isDanger
                     ? "bg-rose-50 text-rose-700 hover:bg-rose-100 border-rose-200"
-                    : st.isGroupPill
-                    ? "bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200"
                     : "bg-slate-100 text-slate-600 hover:bg-slate-200 border-slate-200/80"
                 }`}
               >
@@ -654,34 +770,11 @@ export const TasksAndExtensionsView: React.FC<Props> = ({
             ))}
           </div>
         ) : (
-          <div className="h-9 flex items-center text-xs text-slate-500 px-2">
+          <div className="h-9 flex items-center text-xs text-slate-500 px-1">
             Phê duyệt hoặc từ chối các đề xuất xin gia hạn thời hạn công việc của giảng viên
           </div>
         )}
       </div>
-
-      {/* BANNER QUY TẮC PHÂN QUYỀN MINH CHỨNG & TIẾN ĐỘ NGẮN GỌN (THU GỌN MẶC ĐỊNH) */}
-      {subView === "tasks" && showRuleGuide && (
-        <div className="bg-blue-50/80 border border-blue-200/80 rounded-2xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs text-blue-900">
-          <div className="flex items-center gap-2">
-            <ShieldAlert className="w-4 h-4 text-blue-600 shrink-0" />
-            <span>
-              <b>Quy trình chuẩn:</b> Thành viên nhóm nộp minh chứng lên{" "}
-              <b className="text-amber-800">Trưởng nhóm</b> trước → Chỉ{" "}
-              <b className="text-amber-800">Trưởng nhóm</b> nộp minh chứng chính thức.{" "}
-              <b className="text-indigo-800">Người kiểm tra / Trưởng nhóm</b> cập nhật{" "}
-              <b>% tiến độ</b> và <b>Thông báo thiếu sót</b>.
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowRuleGuide(false)}
-            className="text-blue-700 hover:text-blue-900 font-bold cursor-pointer px-1.5"
-          >
-            ✕
-          </button>
-        </div>
-      )}
 
       {actionMsg && (
         <div
@@ -708,7 +801,7 @@ export const TasksAndExtensionsView: React.FC<Props> = ({
             tabIndex={0}
             role="region"
             aria-labelledby="tasks-table-caption"
-            className="overflow-x-auto max-h-[680px] focus:outline-2 focus:outline-blue-600"
+            className="overflow-x-auto min-h-[500px] max-h-[680px] focus:outline-2 focus:outline-blue-600"
           >
             <span id="tasks-table-caption" className="sr-only">
               Bảng danh sách công việc, tiến độ thành viên nhóm, minh chứng và thời hạn
@@ -724,7 +817,17 @@ export const TasksAndExtensionsView: React.FC<Props> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {filteredTasks.map((t) => {
+                {filteredTasks.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-24 text-center text-slate-400">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <CheckSquare className="w-8 h-8 text-slate-300" />
+                        <span className="text-sm font-medium">Không tìm thấy công việc nào phù hợp với bộ lọc</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredTasks.map((t) => {
                   const roleInfo = getTaskRoleInfo(t);
 
                   return (
@@ -736,7 +839,7 @@ export const TasksAndExtensionsView: React.FC<Props> = ({
                             {t.code}
                           </span>
                           {roleInfo.isGroup ? (
-                            <span className="text-[11px] px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 font-bold">
+                            <span className="text-[11px] px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 font-semibold">
                               Nhóm ({t.assignees?.length} GV)
                             </span>
                           ) : (
@@ -746,6 +849,9 @@ export const TasksAndExtensionsView: React.FC<Props> = ({
                           )}
                           <span className="text-[11px] px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 font-semibold">
                             {t.conversion_hours}h chuẩn
+                          </span>
+                          <span className="text-[11px] px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 font-medium">
+                            {roleInfo.taskDepartmentName}
                           </span>
                         </div>
 
@@ -766,114 +872,197 @@ export const TasksAndExtensionsView: React.FC<Props> = ({
                             Ưu tiên {t.priority}
                           </span>
                           {t.school_catalog_code && (
-                            <span className="px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 font-semibold">
+                            <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold">
                               Trường: {t.school_catalog_code}
                             </span>
                           )}
                         </div>
                       </td>
 
-                      {/* CỘT 2: THÀNH VIÊN NHÓM, TIẾN ĐỘ & TRẠNG THÁI MINH CHỨNG */}
+                      {/* CỘT 2: HIỂN THỊ TIẾN ĐỘ CÔNG VIỆC */}
                       <td className="p-3.5">
-                        <div className="space-y-2">
-                          {t.assignees?.map((a: any) => {
-                            const isLead =
-                              a.is_lead || t.lead_lecturer_id === a.lecturer_id;
-                            const pct = Number(a.progress_pct ?? 0);
-                            const evStatus = a.member_evidence_status || "Chưa nộp";
-
-                            return (
-                              <div
-                                key={a.assignment_id || a.lecturer_id}
-                                className={`p-2.5 rounded-xl border ${
-                                  isLead
-                                    ? "bg-amber-50/40 border-amber-200"
-                                    : "bg-slate-50/80 border-slate-200/80"
-                                }`}
-                              >
-                                <div className="flex items-center justify-between gap-2 text-xs mb-1">
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="font-bold text-slate-800">
-                                      {a.lecturer_name}
-                                    </span>
-                                    {roleInfo.isGroup && isLead && (
-                                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300 font-bold">
-                                        Trưởng nhóm
-                                      </span>
-                                    )}
-                                    {evStatus !== "Chưa nộp" && (
-                                      <span
-                                        className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                                          evStatus === "Cần bổ sung"
-                                            ? "bg-rose-100 text-rose-700 border border-rose-200"
-                                            : evStatus === "Đã gửi Trưởng nhóm"
-                                            ? "bg-blue-100 text-blue-800 border border-blue-200"
-                                            : "bg-emerald-100 text-emerald-800 border border-emerald-200"
-                                        }`}
-                                      >
-                                        {evStatus}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <span className="font-extrabold text-blue-700 shrink-0">
-                                    {pct}%
-                                  </span>
+                        {!roleInfo.showIndividualMemberProgress ? (
+                          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <div>
+                                <div className="text-xs font-bold text-slate-900">
+                                  Tiến độ công việc
                                 </div>
-
-                                <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                                  <div
-                                    className={`h-full rounded-full ${
-                                      a.status === "Hoàn thành"
-                                        ? a.is_late
-                                          ? "bg-rose-500"
-                                          : "bg-emerald-500"
-                                        : "bg-blue-600"
-                                    }`}
-                                    style={{ width: `${pct}%` }}
-                                  />
-                                </div>
-
-                                {a.member_task_note && (
-                                  <div className="text-[11px] text-slate-600 mt-1 truncate">
-                                    📌 <span className="italic">{a.member_task_note}</span>
-                                  </div>
-                                )}
-
-                                {a.review_feedback && (
-                                  <div className="mt-1 px-2 py-1 rounded bg-rose-50 border border-rose-200 text-[11px] text-rose-700 flex items-center gap-1">
-                                    <AlertCircle className="w-3 h-3 shrink-0" />
-                                    <span>Nhắc thiếu sót: {a.review_feedback}</span>
-                                  </div>
-                                )}
-
-                                <div className="flex items-center justify-between gap-2 mt-1">
-                                  <span className="text-[11px] text-slate-500">
-                                    {a.status}
-                                    {a.status === "Hoàn thành" && a.is_late
-                                      ? ` (Trễ ${a.delay_days || 1} ngày)`
-                                      : ""}
-                                  </span>
-
-                                  {a.latest_evidence_name && (
-                                    <a
-                                      href={
-                                        a.latest_evidence_url?.startsWith("http")
-                                          ? a.latest_evidence_url
-                                          : `${BACKEND_ORIGIN}${a.latest_evidence_url}`
-                                      }
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      className="inline-flex items-center gap-1 text-[11px] text-emerald-700 hover:underline font-semibold truncate max-w-[170px]"
-                                    >
-                                      <FileText className="w-3 h-3 shrink-0" />
-                                      {a.latest_evidence_name}
-                                    </a>
-                                  )}
+                                <div className="text-[11px] text-slate-600 mt-0.5">
+                                  Phụ trách chính:{" "}
+                                  <b className="text-slate-800">
+                                    {t.lead_lecturer_name ||
+                                      t.assignees?.[0]?.lecturer_name ||
+                                      "—"}
+                                  </b>{" "}
+                                  {roleInfo.isGroup
+                                    ? `• Nhóm ${t.assignees?.length || 3} giảng viên`
+                                    : "• Cá nhân"}
                                 </div>
                               </div>
-                            );
-                          })}
-                        </div>
+                              <div className="text-right">
+                                <span className="inline-block px-2.5 py-0.5 rounded-lg bg-blue-600 text-white font-bold text-xs">
+                                  {roleInfo.projectProgressPct}%
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all ${
+                                  t.status === "Hoàn thành" || roleInfo.projectProgressPct >= 100
+                                    ? "bg-emerald-500"
+                                    : "bg-blue-600"
+                                }`}
+                                style={{ width: `${roleInfo.projectProgressPct}%` }}
+                              />
+                            </div>
+
+                            <div className="flex flex-wrap items-center justify-between gap-1.5 text-[11px] text-slate-600 pt-0.5">
+                              <span>
+                                Trưởng nhóm: <b className="text-slate-800">{t.lead_approval_status || "Đã duyệt"}</b>
+                              </span>
+                              <span>
+                                Kiểm tra: <b className="text-slate-800">{t.reviewer_approval_status || "Đang theo dõi"}</b>
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {roleInfo.isGroup && (
+                              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+                                <div className="flex items-center justify-between gap-2 text-xs">
+                                  <span className="font-bold text-slate-800">
+                                    Tiến độ dự án
+                                  </span>
+                                  <span className="px-2 py-0.5 rounded-md bg-blue-600 text-white font-bold text-xs">
+                                    {roleInfo.projectProgressPct}%
+                                  </span>
+                                </div>
+                                <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full transition-all ${
+                                      roleInfo.projectProgressPct >= 100
+                                        ? "bg-emerald-500"
+                                        : "bg-blue-600"
+                                    }`}
+                                    style={{ width: `${roleInfo.projectProgressPct}%` }}
+                                  />
+                                </div>
+                                <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] text-slate-600">
+                                  <span>
+                                    Trưởng nhóm:{" "}
+                                    <b className="text-slate-800">
+                                      {t.lead_approval_status || "Chờ Trưởng nhóm duyệt"}
+                                    </b>
+                                  </span>
+                                  <span>
+                                    Người kiểm tra:{" "}
+                                    <b className="text-slate-800">
+                                      {t.reviewer_approval_status || "Chờ Người kiểm tra duyệt"}
+                                    </b>
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+
+                            {t.assignees?.map((a: any) => {
+                              const isLead =
+                                a.is_lead || t.lead_lecturer_id === a.lecturer_id;
+                              const pct = Number(a.progress_pct ?? 0);
+                              const leadAppStatus =
+                                a.lead_approval_status ||
+                                (isLead ? "Trưởng nhóm đã duyệt" : "Chờ Trưởng nhóm duyệt");
+
+                              return (
+                                <div
+                                  key={a.assignment_id || a.lecturer_id}
+                                  className="p-2.5 rounded-xl border bg-white border-slate-200"
+                                >
+                                  <div className="flex items-center justify-between gap-2 text-xs mb-1">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="font-bold text-slate-800">
+                                        {a.lecturer_name}
+                                      </span>
+                                      {roleInfo.isGroup && isLead && (
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 font-semibold">
+                                          Trưởng nhóm
+                                        </span>
+                                      )}
+                                      {roleInfo.isGroup && (
+                                        <span
+                                          className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
+                                            leadAppStatus === "Yêu cầu chỉnh sửa"
+                                              ? "bg-rose-50 text-rose-700 border border-rose-200"
+                                              : leadAppStatus === "Trưởng nhóm đã duyệt"
+                                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                              : "bg-slate-100 text-slate-700 border border-slate-200"
+                                          }`}
+                                        >
+                                          {leadAppStatus}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span className="font-bold text-blue-700 shrink-0">
+                                      {pct}%
+                                    </span>
+                                  </div>
+
+                                  <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                    <div
+                                      className={`h-full rounded-full ${
+                                        a.status === "Hoàn thành"
+                                          ? a.is_late
+                                            ? "bg-rose-500"
+                                            : "bg-emerald-500"
+                                          : "bg-blue-600"
+                                      }`}
+                                      style={{ width: `${pct}%` }}
+                                    />
+                                  </div>
+
+                                  {a.member_task_note && (
+                                    <div className="text-[11px] text-slate-600 mt-1 truncate">
+                                      📌 <span className="italic">{a.member_task_note}</span>
+                                    </div>
+                                  )}
+
+                                  {a.review_feedback && (
+                                    <div className="mt-1 px-2 py-1 rounded bg-rose-50 border border-rose-200 text-[11px] text-rose-700 flex items-center gap-1">
+                                      <AlertCircle className="w-3 h-3 shrink-0" />
+                                      <span>{a.review_feedback}</span>
+                                    </div>
+                                  )}
+
+                                  <div className="flex items-center justify-between gap-2 mt-1">
+                                    <span className="text-[11px] text-slate-500">
+                                      {a.status}
+                                      {a.status === "Hoàn thành" && a.is_late
+                                        ? ` (Trễ ${a.delay_days || 1} ngày)`
+                                        : ""}
+                                    </span>
+
+                                    {a.latest_evidence_name && (
+                                      <a
+                                        href={
+                                          a.latest_evidence_url?.startsWith("http")
+                                            ? a.latest_evidence_url
+                                            : `${BACKEND_ORIGIN}${a.latest_evidence_url}`
+                                        }
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="inline-flex items-center gap-1 text-[11px] text-emerald-700 hover:underline font-semibold truncate max-w-[170px]"
+                                      >
+                                        <FileText className="w-3 h-3 shrink-0" />
+                                        {a.latest_evidence_name}
+                                      </a>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </td>
 
                       {/* CỘT 3: HẠN & NGƯỜI KIỂM TRA */}
@@ -889,7 +1078,7 @@ export const TasksAndExtensionsView: React.FC<Props> = ({
                         <div className="pt-1 border-t border-slate-100 text-[11px] text-slate-500">
                           Kiểm tra:{" "}
                           <b className="text-slate-800">
-                            {t.reviewer_name || t.creator_name || "Trưởng Khoa"}
+                            {t.reviewer_name || t.creator_name || "TS. Phạm Quốc Tuấn"}
                           </b>
                         </div>
                       </td>
@@ -897,7 +1086,7 @@ export const TasksAndExtensionsView: React.FC<Props> = ({
                       {/* CỘT 4: RỦI RO TRỄ HẠN */}
                       <td className="p-3.5">
                         {t.assignees?.slice(0, 1).map((a: any) => {
-                          const ml = a.ml_prediction;
+                          const ml = a.ml_prediction || t.ml_prediction;
                           if (!ml || ml.probability === null || ml.probability === undefined) {
                             return (
                               <span
@@ -925,44 +1114,57 @@ export const TasksAndExtensionsView: React.FC<Props> = ({
                         })}
                       </td>
 
-                      {/* CỘT 5: THAO TÁC PHÂN QUYỀN RÕ RÀNG */}
+                      {/* CỘT 5: THAO TÁC PHÂN QUYỀN 5 CẤP RÕ RÀNG */}
                       <td className="p-3.5 text-right">
                         <div className="flex flex-col items-end gap-1.5">
-                          {/* 1. Thành viên nhóm (không phải Trưởng nhóm) -> Gửi minh chứng lên Trưởng nhóm */}
-                          {t.status !== "Hoàn thành" && roleInfo.isRegularGroupMember && (
-                            <button
-                              onClick={() => openMemberEvidenceModal(t)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold cursor-pointer"
-                            >
-                              <Send className="w-3 h-3" />
-                              Gửi MC lên Trưởng nhóm
-                            </button>
-                          )}
-
-                          {/* 2. Trưởng nhóm / Người kiểm tra / Cá nhân -> Cập nhật % tiến độ (& Trưởng nhóm nộp MC chính thức) */}
-                          {t.status !== "Hoàn thành" && roleInfo.canUpdateProgress && (
+                          {/* 1. Giảng viên (Thành viên hoặc Trưởng nhóm): Cập nhật % tiến độ */}
+                          {t.status !== "Hoàn thành" && roleInfo.canSelfUpdateProgress && (
                             <button
                               onClick={() => openProgressModal(t)}
-                              className="px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold cursor-pointer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold cursor-pointer shadow-2xs"
                             >
-                              {roleInfo.canSubmitOfficialEvidence
-                                ? "Nộp Minh chứng & Tiến độ"
-                                : "Cập nhật % Tiến độ"}
+                              <Upload className="w-3 h-3" />
+                              Cập nhật Tiến độ
                             </button>
                           )}
 
-                          {/* 3. Phân việc nhóm (Dành cho Trưởng nhóm / Quản lý trên việc Nhóm) */}
+                          {/* 2. Trưởng nhóm (Người phụ trách chính): Phê duyệt tiến độ thành viên */}
+                          {t.status !== "Hoàn thành" &&
+                            roleInfo.isGroup &&
+                            roleInfo.canLeadApproveMembers && (
+                              <button
+                                onClick={() => openLeadApproveModal(t)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold cursor-pointer shadow-2xs"
+                              >
+                                <UserCheck className="w-3.5 h-3.5" />
+                                Duyệt Tiến độ Nhóm
+                              </button>
+                            )}
+
+                          {/* 3. Người kiểm tra: Phê duyệt quyết định của Trưởng nhóm */}
+                          {t.status !== "Hoàn thành" &&
+                            roleInfo.canReviewerApproveDecision && (
+                              <button
+                                onClick={() => openReviewerApproveModal(t)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold cursor-pointer shadow-2xs"
+                              >
+                                <ShieldCheck className="w-3.5 h-3.5" />
+                                Duyệt QĐ Trưởng nhóm
+                              </button>
+                            )}
+
+                          {/* 4. Phân việc nhóm (Dành cho Trưởng nhóm trên việc Nhóm) */}
                           {t.status !== "Hoàn thành" && roleInfo.canDelegate && (
                             <button
                               onClick={() => openDelegateModal(t)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-semibold cursor-pointer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-semibold cursor-pointer"
                             >
                               <Users className="w-3.5 h-3.5" />
                               Phân việc nhóm
                             </button>
                           )}
 
-                          {/* 4. Báo thiếu sót / Nhắc nhóm (Dành cho Người kiểm tra / Trưởng nhóm) */}
+                          {/* 5. Báo thiếu sót / Nhắc nhóm (Dành cho Người kiểm tra / Trưởng nhóm) */}
                           {t.status !== "Hoàn thành" && roleInfo.canSendFeedback && (
                             <button
                               onClick={() => openFeedbackModal(t)}
@@ -1006,7 +1208,7 @@ export const TasksAndExtensionsView: React.FC<Props> = ({
                       </td>
                     </tr>
                   );
-                })}
+                }))}
               </tbody>
             </table>
           </div>
@@ -1028,13 +1230,18 @@ export const TasksAndExtensionsView: React.FC<Props> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {extensions.map((e) => (
+                {scopedExtensions.map((e) => (
                   <tr key={e.id} className="hover:bg-slate-50">
                     <td className="p-3.5">
-                      <div className="text-xs font-mono font-bold text-blue-700">
-                        {e.task_code}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-xs font-mono font-bold text-blue-700">
+                          {e.task_code}
+                        </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 font-semibold">
+                          {e.department_name || "Bộ môn CNPM (K01)"}
+                        </span>
                       </div>
-                      <div className="font-semibold text-slate-900">{e.task_title}</div>
+                      <div className="font-semibold text-slate-900 mt-0.5">{e.task_title}</div>
                       <div className="text-xs text-slate-500">
                         Người xin: <b>{e.requester_name}</b> ({e.progress_pct}%)
                       </div>
@@ -1089,7 +1296,7 @@ export const TasksAndExtensionsView: React.FC<Props> = ({
         </div>
       )}
 
-      {/* MODAL 1: CẬP NHẬT TIẾN ĐỘ (%) & NỘP MINH CHỨNG CHÍNH THỨC (CHỈ TRƯỞNG NHÓM MỚI ĐƯỢC UPLOAD MINH CHỨNG) */}
+      {/* MODAL 1: GIẢNG VIÊN TỰ CẬP NHẬT TIẾN ĐỘ CÁ NHÂN (%) & ĐÍNH KÈM MINH CHỨNG */}
       {progTask && (
         <div
           onClick={(e) => {
@@ -1104,14 +1311,20 @@ export const TasksAndExtensionsView: React.FC<Props> = ({
             className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4"
           >
             {(() => {
-              const roleInfo = getTaskRoleInfo(progTask);
+              const previewAssignees = (progTask.assignees || []).map((a: any) =>
+                Number(a.lecturer_id) === Number(progLecturerId)
+                  ? { ...a, progress_pct: progPct }
+                  : a
+              );
+              const previewProjectPct = calculateProjectProgressFromMembers(
+                previewAssignees,
+                progPct
+              );
               return (
                 <>
                   <div>
                     <h3 className="text-base font-bold text-slate-900">
-                      {roleInfo.canSubmitOfficialEvidence
-                        ? `Nộp Minh chứng Chính thức & Cập nhật Tiến độ (${progTask.code})`
-                        : `Kiểm tra & Cập nhật Tiến độ Thành viên (${progTask.code})`}
+                      Giảng viên Tự Cập nhật Tiến độ Cá nhân ({progTask.code})
                     </h3>
                     <p className="text-xs text-slate-600 mt-0.5">{progTask.title}</p>
                   </div>
@@ -1119,7 +1332,7 @@ export const TasksAndExtensionsView: React.FC<Props> = ({
                   {progTask.assignees?.length > 1 && (
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Chọn thành viên nhóm để cập nhật tiến độ (%)
+                        Tài khoản Giảng viên đang tự cập nhật tiến độ cá nhân
                       </label>
                       <select
                         value={progLecturerId || ""}
@@ -1140,8 +1353,8 @@ export const TasksAndExtensionsView: React.FC<Props> = ({
                             {a.lecturer_name}{" "}
                             {a.is_lead || progTask.lead_lecturer_id === a.lecturer_id
                               ? "(Trưởng nhóm)"
-                              : ""}{" "}
-                            — Tiến độ {a.progress_pct}% ({a.member_evidence_status || "Chưa nộp"})
+                              : "(Thành viên)"}{" "}
+                            — Hiện tại: {a.progress_pct}%
                           </option>
                         ))}
                       </select>
@@ -1150,7 +1363,7 @@ export const TasksAndExtensionsView: React.FC<Props> = ({
 
                   <div>
                     <div className="flex justify-between text-xs font-semibold mb-1">
-                      <span>Mức hoàn thành (%)</span>
+                      <span>Tiến độ cá nhân của bạn (%)</span>
                       <span className="text-blue-600 font-bold text-sm">{progPct}%</span>
                     </div>
                     <input
@@ -1180,72 +1393,68 @@ export const TasksAndExtensionsView: React.FC<Props> = ({
                     </div>
                   </div>
 
-                  {/* CHỈ TRƯỞNG NHÓM (HOẶC CÁ NHÂN ĐƯỢC GIAO) MỚI HIỂN THỊ Ô NỘP MINH CHỨNG */}
-                  {roleInfo.canSubmitOfficialEvidence ? (
-                    <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200 space-y-2">
-                      <label className="block text-xs font-bold text-amber-900">
-                        Nộp File Minh chứng Chính thức (Quyền Trưởng nhóm / Người phụ trách chính)
-                      </label>
-                      <label className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-dashed border-amber-400 bg-white hover:bg-amber-50 text-xs font-semibold text-amber-800 cursor-pointer transition">
-                        <Upload className="w-4 h-4" />
-                        <span>
-                          {uploadingFile
-                            ? "Đang tải file lên..."
-                            : "Chọn file minh chứng chính thức (.pdf, .docx, .zip...)"}
-                        </span>
-                        <input
-                          type="file"
-                          onChange={(e) => {
-                            const f = e.target.files?.[0];
-                            if (f) {
-                              uploadFileHelper(f, (name, url) => {
-                                setEvidenceFileName(name);
-                                setEvidenceFileUrl(url);
-                              });
-                            }
-                          }}
-                          className="hidden"
-                        />
-                      </label>
-                      {evidenceFileName && (
-                        <div className="flex items-center justify-between text-xs bg-emerald-50 border border-emerald-200 text-emerald-800 px-2.5 py-1.5 rounded-lg">
-                          <span className="truncate font-medium">
-                            Đã chọn: <b>{evidenceFileName}</b>
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEvidenceFileName("");
-                              setEvidenceFileUrl("");
-                            }}
-                            className="text-rose-600 font-bold ml-2 cursor-pointer"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="p-3 rounded-xl bg-slate-100 border border-slate-200 text-xs text-slate-600 flex items-start gap-2">
-                      <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                      <span>
-                        Tài khoản Quản lý / Người kiểm tra <b>không nộp thay minh chứng</b> của
-                        tài khoản khác. Chỉ <b>Trưởng nhóm (Người phụ trách chính)</b> mới có
-                        quyền nộp file minh chứng chính thức. Bạn có thể cập nhật % tiến độ hoặc
-                        báo thiếu sót cho nhóm.
+                  {progTask.assignees?.length > 1 && (
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 flex items-center justify-between">
+                      <span className="font-semibold">Tiến độ dự án sau cập nhật:</span>
+                      <span className="px-2.5 py-0.5 rounded-md bg-blue-600 text-white font-bold">
+                        {previewProjectPct}%
                       </span>
                     </div>
                   )}
 
+                  <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200 space-y-2">
+                    <label className="block text-xs font-bold text-amber-900">
+                      Đính kèm File Minh chứng Kết quả Công việc
+                    </label>
+                    <label className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-dashed border-amber-400 bg-white hover:bg-amber-50 text-xs font-semibold text-amber-800 cursor-pointer transition">
+                      <Upload className="w-4 h-4" />
+                      <span>
+                        {uploadingFile
+                          ? "Đang tải file lên..."
+                          : "Chọn file minh chứng (.pdf, .docx, .zip...)"}
+                      </span>
+                      <input
+                        type="file"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) {
+                            uploadFileHelper(f, (name, url) => {
+                              setEvidenceFileName(name);
+                              setEvidenceFileUrl(url);
+                            });
+                          }
+                        }}
+                        className="hidden"
+                      />
+                    </label>
+                    {evidenceFileName && (
+                      <div className="flex items-center justify-between text-xs bg-emerald-50 border border-emerald-200 text-emerald-800 px-2.5 py-1.5 rounded-lg">
+                        <span className="truncate font-medium">
+                          Đã chọn: <b>{evidenceFileName}</b>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEvidenceFileName("");
+                            setEvidenceFileUrl("");
+                          }}
+                          className="text-rose-600 font-bold ml-2 cursor-pointer"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Nhận xét / Ghi chú tiến độ *
+                      Báo cáo kết quả thực hiện gửi Trưởng nhóm phê duyệt *
                     </label>
                     <textarea
                       value={progNote}
                       onChange={(e) => setProgNote(e.target.value)}
                       rows={3}
-                      placeholder="Nhập nhận xét tiến độ hoặc ghi chú bàn giao..."
+                      placeholder="Nhập kết quả phần việc bạn đã thực hiện..."
                       className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs"
                       required
                     />
@@ -1264,7 +1473,7 @@ export const TasksAndExtensionsView: React.FC<Props> = ({
                       disabled={uploadingFile}
                       className="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold cursor-pointer"
                     >
-                      Lưu Cập nhật
+                      Lưu & Gửi Trưởng nhóm duyệt
                     </button>
                   </div>
                 </>
@@ -1674,7 +1883,7 @@ export const TasksAndExtensionsView: React.FC<Props> = ({
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 rounded-xl bg-purple-600 text-white text-xs font-semibold cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold cursor-pointer"
               >
                 Xác nhận
               </button>
@@ -1783,6 +1992,307 @@ export const TasksAndExtensionsView: React.FC<Props> = ({
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* MODAL 6: TRƯỞNG NHÓM (NGƯỜI PHỤ TRÁCH CHÍNH) PHÊ DUYỆT TIẾN ĐỘ TỪNG THÀNH VIÊN & GỬI HỆ THỐNG TỰ TÍNH % DỰ ÁN */}
+      {leadApproveTask && (
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setLeadApproveTask(null);
+          }}
+          className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4"
+        >
+          <form
+            role="dialog"
+            aria-modal="true"
+            onSubmit={handleSaveLeadApproval}
+            className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto text-xs"
+          >
+            {(() => {
+              const autoPct = calculateProjectProgressFromMembers(
+                leadApproveTask.assignees,
+                leadApproveTask.progress_pct
+              );
+              return (
+                <>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <span className="inline-block px-2.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold text-[11px] mb-1">
+                        Quyền Trưởng nhóm (Người phụ trách chính)
+                      </span>
+                      <h3 className="text-base font-bold text-slate-900">
+                        Phê duyệt Tiến độ Thành viên & Gửi Hệ thống ({leadApproveTask.code})
+                      </h3>
+                      <p className="text-xs text-slate-600 mt-0.5">
+                        {leadApproveTask.title}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setLeadApproveTask(null)}
+                      className="px-2.5 py-1 rounded-lg bg-slate-100 font-bold"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+                    <span className="font-bold text-slate-800">
+                      Tiến độ dự án
+                    </span>
+                    <span className="px-3 py-1 rounded-lg bg-blue-600 text-white font-bold text-sm">
+                      {autoPct}%
+                    </span>
+                  </div>
+
+                  <div className="space-y-2.5">
+                    <div className="font-bold text-slate-800">
+                      Tiến độ các thành viên trong nhóm:
+                    </div>
+                    {(leadApproveTask.assignees || []).map((a: any) => {
+                      const dec = leadMemberDecisions[a.lecturer_id] || {
+                        approval_status: "Trưởng nhóm đã duyệt",
+                        review_note: "",
+                      };
+                      return (
+                        <div
+                          key={a.lecturer_id}
+                          className="p-3 rounded-xl border border-slate-200 bg-slate-50 space-y-2"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              <span className="font-bold text-slate-900">
+                                {a.lecturer_name}
+                              </span>{" "}
+                              {a.is_lead && (
+                                <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-bold text-[10px]">
+                                  Trưởng nhóm
+                                </span>
+                              )}
+                              <div className="text-[11px] text-slate-500">
+                                Phần việc: {a.member_task_note || "Thực hiện chuyên môn nhóm"}
+                              </div>
+                            </div>
+                            <span className="px-2.5 py-1 rounded-lg bg-blue-100 text-blue-800 font-extrabold text-xs">
+                              Tự cập nhật: {a.progress_pct}%
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <select
+                              value={dec.approval_status}
+                              onChange={(e) =>
+                                setLeadMemberDecisions((prev) => ({
+                                  ...prev,
+                                  [a.lecturer_id]: {
+                                    ...dec,
+                                    approval_status: e.target.value,
+                                  },
+                                }))
+                              }
+                              className="px-3 py-1.5 rounded-xl border border-slate-300 bg-white font-bold text-slate-800"
+                            >
+                              <option value="Trưởng nhóm đã duyệt">
+                                ✓ Trưởng nhóm đã duyệt ({a.progress_pct}%)
+                              </option>
+                              <option value="Yêu cầu chỉnh sửa">
+                                ⚠ Yêu cầu thành viên chỉnh sửa / bổ sung
+                              </option>
+                            </select>
+                            <input
+                              type="text"
+                              value={dec.review_note}
+                              onChange={(e) =>
+                                setLeadMemberDecisions((prev) => ({
+                                  ...prev,
+                                  [a.lecturer_id]: {
+                                    ...dec,
+                                    review_note: e.target.value,
+                                  },
+                                }))
+                              }
+                              placeholder="Nhận xét của Trưởng nhóm (nếu có)..."
+                              className="px-3 py-1.5 rounded-xl border border-slate-300 bg-white"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Ghi chú trình Người kiểm tra ({leadApproveTask.reviewer_name || "TS. Phạm Quốc Tuấn"})
+                    </label>
+                    <textarea
+                      value={leadDecisionNote}
+                      onChange={(e) => setLeadDecisionNote(e.target.value)}
+                      rows={2}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl"
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setLeadApproveTask(null)}
+                      className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-semibold cursor-pointer"
+                    >
+                      Hủy
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold cursor-pointer"
+                    >
+                      Xác nhận Phê duyệt ({autoPct}%)
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
+          </form>
+        </div>
+      )}
+
+      {/* MODAL 7: NGƯỜI KIỂM TRA QUAN SÁT TIẾN ĐỘ TỪNG THÀNH VIÊN & PHÊ DUYỆT QUYẾT ĐỊNH TRƯỞNG NHÓM */}
+      {reviewerApproveTask && (
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setReviewerApproveTask(null);
+          }}
+          className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4"
+        >
+          <form
+            role="dialog"
+            aria-modal="true"
+            onSubmit={handleSaveReviewerApproval}
+            className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto text-xs"
+          >
+            {(() => {
+              const autoPct = calculateProjectProgressFromMembers(
+                reviewerApproveTask.assignees,
+                reviewerApproveTask.progress_pct
+              );
+              return (
+                <>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <span className="inline-block px-2.5 py-0.5 rounded-md bg-indigo-100 text-indigo-800 font-bold text-[11px] mb-1">
+                        Quyền Người kiểm tra ({reviewerApproveTask.reviewer_name || "TS. Phạm Quốc Tuấn"})
+                      </span>
+                      <h3 className="text-base font-bold text-slate-900">
+                        Phê duyệt Quyết định của Trưởng nhóm ({reviewerApproveTask.code})
+                      </h3>
+                      <p className="text-xs text-slate-600 mt-0.5">
+                        {reviewerApproveTask.title}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setReviewerApproveTask(null)}
+                      className="px-2.5 py-1 rounded-lg bg-slate-100 font-bold"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-700">
+                        Trưởng nhóm ({reviewerApproveTask.lead_lecturer_name}):
+                      </span>
+                      <span className="px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 font-bold">
+                        {reviewerApproveTask.lead_approval_status || "Đã duyệt & Trình Người kiểm tra"}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs border-t border-slate-200 pt-2">
+                      <span className="font-semibold text-slate-700">Tiến độ dự án:</span>
+                      <span className="font-bold text-blue-700 text-sm">
+                        {autoPct}%
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="font-bold text-slate-800">
+                      Quan sát chi tiết tiến độ từng thành viên trong nhóm:
+                    </div>
+                    {(reviewerApproveTask.assignees || []).map((a: any) => (
+                      <div
+                        key={a.lecturer_id}
+                        className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between gap-2"
+                      >
+                        <div>
+                          <div className="font-bold text-slate-900">
+                            {a.lecturer_name}{" "}
+                            {a.is_lead && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-bold">
+                                Trưởng nhóm
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-slate-500">
+                            Trạng thái Trưởng nhóm duyệt:{" "}
+                            <b>{a.lead_approval_status || "Trưởng nhóm đã duyệt"}</b>
+                          </div>
+                        </div>
+                        <span className="px-2.5 py-1 rounded-lg bg-blue-600 text-white font-extrabold">
+                          {a.progress_pct}%
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Quyết định của Người kiểm tra
+                    </label>
+                    <select
+                      value={reviewerDecisionStatus}
+                      onChange={(e) => setReviewerDecisionStatus(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl bg-white font-bold text-slate-900"
+                    >
+                      <option value="Đã phê duyệt quyết định Trưởng nhóm">
+                        ✓ Phê duyệt quyết định của Trưởng nhóm (Công nhận tiến độ dự án {autoPct}%)
+                      </option>
+                      <option value="Yêu cầu Trưởng nhóm rà soát lại">
+                        ⚠ Yêu cầu Trưởng nhóm rà soát / bổ sung minh chứng
+                      </option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Nhận xét của Người kiểm tra
+                    </label>
+                    <textarea
+                      value={reviewerDecisionNote}
+                      onChange={(e) => setReviewerDecisionNote(e.target.value)}
+                      rows={2}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-xl"
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setReviewerApproveTask(null)}
+                      className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-semibold cursor-pointer"
+                    >
+                      Hủy
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold cursor-pointer"
+                    >
+                      Xác nhận Quyết định Kiểm tra
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
+          </form>
         </div>
       )}
     </div>

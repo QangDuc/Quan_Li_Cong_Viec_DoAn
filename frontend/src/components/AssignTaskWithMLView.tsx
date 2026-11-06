@@ -14,6 +14,7 @@ import { API_BASE, formatFeatureName } from "../types";
 
 interface Props {
   token: string;
+  currentUser?: any;
   taskTypes: any[];
   schoolCatalog: any[];
   users: any[];
@@ -22,12 +23,24 @@ interface Props {
 
 export const AssignTaskWithMLView: React.FC<Props> = ({
   token,
+  currentUser,
   taskTypes,
   schoolCatalog,
   users,
   onAssigned,
 }) => {
-  const lecturers = users.filter((u) => u.role === "lecturer" && u.is_active !== false);
+  const isDeptHead =
+    currentUser?.role === "manager" &&
+    currentUser?.department_id !== null &&
+    currentUser?.department_id !== undefined;
+
+  const lecturers = users.filter((u) => {
+    if (u.role !== "lecturer" || u.is_active === false) return false;
+    if (isDeptHead) {
+      return Number(u.department_id) === Number(currentUser.department_id);
+    }
+    return true;
+  });
   const defaultDeadline = new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10);
 
   const [title, setTitle] = useState("");
@@ -171,6 +184,8 @@ export const AssignTaskWithMLView: React.FC<Props> = ({
           title: title.trim(),
           description: description.trim(),
           task_type_id: taskTypeId,
+          department_id: isDeptHead ? Number(currentUser.department_id) : null,
+          acting_dept_head_department_id: isDeptHead ? Number(currentUser.department_id) : null,
           scale,
           school_catalog_id: schoolCatalogId === "" ? null : Number(schoolCatalogId),
           priority,
@@ -212,6 +227,12 @@ export const AssignTaskWithMLView: React.FC<Props> = ({
           <p className="text-xs text-slate-500 mt-0.5">
             Khi chọn nhóm công việc, AI bên phải sẽ tự động lọc các giảng viên thuộc đúng nhóm công việc đó có độ trễ thấp nhất.
           </p>
+          {isDeptHead && (
+            <div className="mt-2 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold">
+              Phạm vi Trưởng Bộ môn: Chỉ giao và quản lý các công việc thuộc{" "}
+              <b>{currentUser.department_name || `Bộ môn K0${currentUser.department_id}`}</b> của Khoa.
+            </div>
+          )}
         </div>
 
         {errorMsg && (

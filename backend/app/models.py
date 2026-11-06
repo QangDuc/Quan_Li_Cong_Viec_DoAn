@@ -224,6 +224,7 @@ class Task(Base):
     title: Mapped[str] = mapped_column(Unicode(300))
     description: Mapped[str | None] = mapped_column(UnicodeText)
     task_type_id: Mapped[int] = mapped_column(ForeignKey("task_types.id"))
+    department_id: Mapped[int | None] = mapped_column(ForeignKey("departments.id"))
     scale: Mapped[str] = mapped_column(Unicode(30), default="quy mô chuẩn")
     school_catalog_id: Mapped[int | None] = mapped_column(ForeignKey("school_catalog.id"))
     priority: Mapped[str] = mapped_column(Unicode(20), default="Trung bình")
@@ -240,6 +241,13 @@ class Task(Base):
     original_deadline: Mapped[date] = mapped_column(Date)
     current_deadline: Mapped[date] = mapped_column(Date)
     status: Mapped[str] = mapped_column(Unicode(30), default=ST_NEW)
+    progress_pct: Mapped[int] = mapped_column(Integer, default=0)   # Tự động tính từ trung bình cộng tiến độ các thành viên nhóm
+    lead_approval_status: Mapped[str] = mapped_column(Unicode(60), default="Chờ Trưởng nhóm duyệt")
+    lead_decision_note: Mapped[str | None] = mapped_column(Unicode(500))
+    lead_submitted_at: Mapped[datetime | None] = mapped_column(DateTime)
+    reviewer_approval_status: Mapped[str] = mapped_column(Unicode(60), default="Chờ Người kiểm tra duyệt")
+    reviewer_decision_note: Mapped[str | None] = mapped_column(Unicode(500))
+    reviewer_approved_at: Mapped[datetime | None] = mapped_column(DateTime)
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     reviewer_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
     lead_lecturer_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
@@ -248,9 +256,11 @@ class Task(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
     task_type: Mapped[TaskType] = relationship()
+    department: Mapped[Department | None] = relationship()
     school_item: Mapped[SchoolCatalogItem | None] = relationship()
     assignments: Mapped[list["TaskAssignment"]] = relationship(back_populates="task", order_by="TaskAssignment.id")
     extensions: Mapped[list["ExtensionRequest"]] = relationship(back_populates="task", order_by="ExtensionRequest.id")
+    approval_logs: Mapped[list["TaskApprovalLog"]] = relationship(back_populates="task", order_by="TaskApprovalLog.id")
     creator: Mapped[User | None] = relationship(foreign_keys=[created_by])
     reviewer: Mapped[User | None] = relationship(foreign_keys=[reviewer_id])
     lead_lecturer: Mapped[User | None] = relationship(foreign_keys=[lead_lecturer_id])
@@ -269,8 +279,12 @@ class TaskAssignment(Base):
     latest_evidence_name: Mapped[str | None] = mapped_column(Unicode(300))
     latest_evidence_url: Mapped[str | None] = mapped_column(Unicode(500))
     member_evidence_status: Mapped[str | None] = mapped_column(Unicode(50))   # Đã gửi Trưởng nhóm | Đã xác nhận | Cần bổ sung
+    lead_approval_status: Mapped[str] = mapped_column(Unicode(60), default="Chờ Trưởng nhóm duyệt")
+    lead_approved_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    lead_approved_at: Mapped[datetime | None] = mapped_column(DateTime)
     review_feedback: Mapped[str | None] = mapped_column(Unicode(500))         # Nhận xét / thông báo thiếu sót từ Trưởng nhóm hoặc Người kiểm tra
     progress_pct: Mapped[int] = mapped_column(Integer, default=0)
+    self_updated_at: Mapped[datetime | None] = mapped_column(DateTime)
     status: Mapped[str] = mapped_column(Unicode(30), default=ST_NEW)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime)
     is_late: Mapped[bool | None] = mapped_column(Boolean)              # so với HẠN GỐC (= nhãn is_late của mô hình)
@@ -278,8 +292,28 @@ class TaskAssignment(Base):
     delay_days: Mapped[float | None] = mapped_column(Float)            # số ngày trễ so với hạn gốc (âm = sớm)
 
     task: Mapped[Task] = relationship(back_populates="assignments")
-    lecturer: Mapped[User] = relationship()
+    lecturer: Mapped[User] = relationship(foreign_keys=[lecturer_id])
+    lead_approver: Mapped[User | None] = relationship(foreign_keys=[lead_approved_by])
     progress_updates: Mapped[list["ProgressUpdate"]] = relationship(back_populates="assignment", order_by="ProgressUpdate.id")
+
+
+class TaskApprovalLog(Base):
+    """Bảng lưu vết lịch sử phê duyệt đa cấp (Thành viên -> Trưởng nhóm -> Hệ thống tự tính -> Người kiểm tra)."""
+    __tablename__ = "task_approval_logs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    task_id: Mapped[int] = mapped_column(ForeignKey("tasks.id"))
+    assignment_id: Mapped[int | None] = mapped_column(ForeignKey("task_assignments.id"))
+    actor_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    actor_role: Mapped[str] = mapped_column(Unicode(50))
+    action_type: Mapped[str] = mapped_column(Unicode(64))
+    member_progress_pct: Mapped[int | None] = mapped_column(Integer)
+    calculated_project_pct: Mapped[int | None] = mapped_column(Integer)
+    approval_status: Mapped[str] = mapped_column(Unicode(64))
+    note: Mapped[str | None] = mapped_column(Unicode(1000))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+    task: Mapped[Task] = relationship(back_populates="approval_logs")
+    actor: Mapped[User] = relationship(foreign_keys=[actor_user_id])
 
 
 class ProgressUpdate(Base):

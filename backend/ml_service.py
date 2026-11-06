@@ -1,4 +1,4 @@
-﻿"""
+"""
 Dịch vụ Machine Learning suy luận độc lập (FastAPI, cổng 8001) — Phiên bản V4 (TabPFN v2 + MLOps Registry).
 
 Nạp model/risk_model.joblib (hoặc kho phiên bản model/registry CURRENT = v0001) và dùng đúng bộ mã hóa (encoder),

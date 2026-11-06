@@ -1,4 +1,4 @@
-﻿task_id,lecturer_id,risk_probability,level,model_version
+task_id,lecturer_id,risk_probability,level,model_version
 T009453,GV054,0.21651915973939345,Trung bình,v0001
 T018788,GV110,0.08152544155802502,Thấp,v0001
 T026292,GV154,0.05715633781653681,Thấp,v0001

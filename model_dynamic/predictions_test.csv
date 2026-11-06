@@ -1,4 +1,4 @@
-﻿task_id,lecturer_id,faculty,assigned_date,checkpoint_fraction,y,risk_probability,risk_uncertainty
+task_id,lecturer_id,faculty,assigned_date,checkpoint_fraction,y,risk_probability,risk_uncertainty
 T017098,GV097,K06,2027-08-12,0.25,0,0.03074,0.00404
 T007712,GV272,K05,2027-08-12,0.5,0,0.29557,0.02453
 T049301,GV301,K05,2027-08-12,0.25,0,0.0555,0.00466

@@ -1,4 +1,4 @@
-﻿task_id,lecturer_id,faculty,assigned_date,y,risk_probability
+task_id,lecturer_id,faculty,assigned_date,y,risk_probability
 T051048,GV234,K01,2027-01-05,0,0.12867
 T036778,GV220,K03,2027-01-05,0,0.56207
 T037025,GV221,K04,2027-01-05,0,0.25802

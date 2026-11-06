@@ -10,15 +10,17 @@ from sqlalchemy import desc, or_
 
 from app.db import get_db
 from app.models import (
-    Task, TaskAssignment, TaskType, TaskTypeScale, User, ProgressUpdate,
+    Task, TaskAssignment, TaskApprovalLog, TaskType, TaskTypeScale, User, ProgressUpdate,
     ExtensionRequest, Notification, RiskPrediction, ST_NEW, ST_DOING, ST_DONE,
     EXT_PENDING, EXT_APPROVED, EXT_REJECTED, ROLE_MANAGER, ROLE_ADMIN, ROLE_LECTURER
 )
 from app.deps import current_user, manager_or_admin, lecturer_scope, can_see_lecturer, can_see_risk
+from app.rbac import calculate_project_progress_from_assignments, is_task_in_manager_department_scope
 from app.schemas import (
     TaskCreate, TaskRiskPreviewRequest, ProgressUpdateCreate,
     ExtensionCreate, ExtensionReview, GroupDelegateRequest,
-    MemberEvidenceSubmitRequest, TaskFeedbackRequest
+    MemberEvidenceSubmitRequest, TaskFeedbackRequest,
+    LeadGroupApproveRequest, ReviewerApproveLeadRequest
 )
 from app.ml_client import predict_and_record_risk, preview_risk_for_features, preview_risk_for_features_batch
 from app.ml_extract import extract_features_for_preview
@@ -81,6 +83,14 @@ def list_tasks(
                 TaskAssignment.lecturer_id == user.id,
                 Task.lead_lecturer_id == user.id,
                 Task.reviewer_id == user.id
+            )
+        )
+    elif user.role == ROLE_MANAGER and user.department_id is not None:
+        # Trưởng Bộ môn chỉ quản lý được các công việc thuộc Bộ môn đó của Khoa
+        query = query.outerjoin(TaskAssignment).filter(
+            or_(
+                Task.department_id == user.department_id,
+                TaskAssignment.lecturer_id.in_(scope or []),
             )
         )
     elif scope is not None:
@@ -176,6 +186,12 @@ def list_tasks(
             lead_name = lead_user.full_name if lead_user else None
             lead_id = t.lead_lecturer_id
 
+        task_dept_id = t.department_id
+        task_dept_name = t.department.name if t.department else None
+        if not task_dept_id and lead_user and lead_user.department_id:
+            task_dept_id = lead_user.department_id
+            task_dept_name = lead_user.department.name if lead_user.department else None
+
         res.append({
             "id": t.id,
             "code": t.code,
@@ -184,6 +200,8 @@ def list_tasks(
             "task_type_id": t.task_type_id,
             "task_type_name": t.task_type.name,
             "task_group": t.task_type.task_group,
+            "department_id": task_dept_id,
+            "department_name": task_dept_name or "Khoa CNTT",
             "scale": t.scale,
             "school_catalog_id": t.school_catalog_id,
             "school_catalog_code": t.school_item.code if t.school_item else None,
@@ -194,6 +212,11 @@ def list_tasks(
             "assignment_mode": t.assignment_mode,
             "assignment_level": t.assignment_level,
             "status": t.status,
+            "progress_pct": t.progress_pct,
+            "lead_approval_status": t.lead_approval_status,
+            "lead_decision_note": t.lead_decision_note,
+            "reviewer_approval_status": t.reviewer_approval_status,
+            "reviewer_decision_note": t.reviewer_decision_note,
             "assigned_at": t.assigned_at,
             "original_deadline": t.original_deadline,
             "current_deadline": t.current_deadline,
@@ -620,18 +643,33 @@ def create_task(req: TaskCreate, db: Session = Depends(get_db), user: User = Dep
     reviewer_id = req.reviewer_id if req.reviewer_id else user.id
     reviewer_user = db.get(User, reviewer_id) or user
 
+    # Ràng buộc Trưởng Bộ môn: chỉ được giao và quản lý công việc thuộc Bộ môn của mình trong Khoa
+    lead_user_obj = db.get(User, lead_id)
+    if user.role == ROLE_MANAGER and user.department_id is not None:
+        assigned_users = db.query(User).filter(User.id.in_(unique_lecturer_ids)).all()
+        for au in assigned_users:
+            if au.department_id != user.department_id:
+                raise HTTPException(
+                    status.HTTP_403_FORBIDDEN,
+                    "Phân quyền CSDL (RBAC): Trưởng Bộ môn chỉ quản lý và giao được các công việc thuộc Bộ môn đó của Khoa!"
+                )
+        task_department_id = user.department_id
+    else:
+        task_department_id = lead_user_obj.department_id if lead_user_obj else user.department_id
+
     code = f"CV-{datetime.now().strftime('%y%m%d')}-{uuid.uuid4().hex[:4].upper()}"
     task = Task(
         code=code,
         title=req.title,
         description=req.description,
         task_type_id=req.task_type_id,
+        department_id=task_department_id,
         scale=req.scale or "quy mô chuẩn",
         school_catalog_id=req.school_catalog_id,
         priority=req.priority or "Trung bình",
         complexity=req.complexity or "Trung bình",
         assignment_mode="Group" if len(unique_lecturer_ids) > 1 else "Individual",
-        assignment_level=req.assignment_level or "Khoa",
+        assignment_level=req.assignment_level or ("Bộ môn" if user.department_id else "Khoa"),
         assignment_channel=req.assignment_channel or "Hệ thống",
         subtask_count=req.subtask_count or 1,
         dependency_count=req.dependency_count or 0,
@@ -948,87 +986,41 @@ def update_progress(
     target_lecturer_id = req.lecturer_id or user.id
     assign = db.query(TaskAssignment).filter_by(task_id=task_id, lecturer_id=target_lecturer_id).first()
 
-    if not assign and (is_reviewer_or_mgr or is_user_lead):
-        assign = (
-            db.query(TaskAssignment).filter_by(task_id=task_id, is_lead=True).first()
-            or db.query(TaskAssignment).filter_by(task_id=task_id).first()
-        )
-
     if not assign:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Bạn không tham gia hoặc không có quyền trên công việc này")
 
-    # KIỂM TRA QUYỀN NỘP MINH CHỨNG:
-    # Quản lý / Admin / Người kiểm tra (không phải người phụ trách chính) không được phép gửi minh chứng thay cho tài khoản khác
-    is_uploading_new_evidence = bool(req.evidence_file_url and req.evidence_file_url != assign.latest_evidence_url)
-    if is_uploading_new_evidence:
-        if my_assign is None:
-            raise HTTPException(
-                status.HTTP_403_FORBIDDEN,
-                "Tài khoản Quản lý / Người kiểm tra không được nộp thay file minh chứng của giảng viên khác. Chỉ Trưởng nhóm (Người phụ trách chính) mới có quyền nộp minh chứng!"
-            )
-        if is_group and not is_user_lead:
-            # Nếu là thành viên thường trong nhóm nộp minh chứng -> Gửi lên Trưởng nhóm trước!
-            now = datetime.now()
-            my_assign.latest_evidence_name = req.evidence_file_name or "File minh chứng thành viên"
-            my_assign.latest_evidence_url = req.evidence_file_url
-            my_assign.member_evidence_status = "Đã gửi Trưởng nhóm"
-            if my_assign.status == ST_NEW:
-                my_assign.status = ST_DOING
-                task.status = ST_DOING
-            prog = ProgressUpdate(
-                assignment_id=my_assign.id,
-                progress_pct=my_assign.progress_pct,
-                note=f"[Gửi Trưởng nhóm duyệt] {req.note or 'Nộp minh chứng phần việc thành viên'}",
-                evidence_file_name=my_assign.latest_evidence_name,
-                evidence_file_url=my_assign.latest_evidence_url,
-                created_by=user.id,
-                created_at=now
-            )
-            db.add(prog)
-            if task.lead_lecturer_id and task.lead_lecturer_id != user.id:
-                db.add(Notification(
-                    user_id=task.lead_lecturer_id,
-                    kind="new_task",
-                    title=f"Minh chứng thành viên [{task.code}]: {user.full_name}",
-                    content=f"Thành viên {user.full_name} vừa gửi minh chứng '{my_assign.latest_evidence_name}' lên Trưởng nhóm duyệt.",
-                    task_id=task.id,
-                    dedupe_key=f"mem_ev2:{task.id}:{user.id}:{uuid.uuid4().hex[:6]}"
-                ))
-            db.commit()
-            return {
-                "message": "Đã gửi file minh chứng lên Trưởng nhóm (Người phụ trách chính) xem xét trước khi cập nhật tiến độ!",
-                "progress_pct": my_assign.progress_pct,
-                "status": my_assign.status,
-                "evidence_file_name": my_assign.latest_evidence_name,
-                "evidence_file_url": my_assign.latest_evidence_url,
-                "member_evidence_status": my_assign.member_evidence_status
-            }
-
-    # KIỂM TRA QUYỀN CẬP NHẬT TIẾN ĐỘ (%):
-    # Trong công việc nhóm, chỉ Người kiểm tra / Quản lý hoặc Người phụ trách chính (Trưởng nhóm) mới được cập nhật % tiến độ
-    if is_group and not (is_user_lead or is_reviewer_or_mgr):
+    # QUY TẮC PHÂN QUYỀN MỚI:
+    # 1. Mỗi tài khoản giảng viên (thành viên trong nhóm) TỰ CẬP NHẬT % tiến độ của chính mình.
+    # 2. Trưởng nhóm (Người phụ trách chính) chỉ PHÊ DUYỆT tiến độ của thành viên (qua endpoint /lead-approve), không nhập hộ % của thành viên khác.
+    if assign.lecturer_id != user.id and user.role != ROLE_ADMIN:
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
-            "Trong công việc nhóm, thành viên gửi minh chứng lên Trưởng nhóm trước. Chỉ Trưởng nhóm (Phụ trách chính) hoặc Người kiểm tra mới có quyền cập nhật % tiến độ!"
+            "Mỗi giảng viên tự cập nhật % tiến độ của chính mình. Trưởng nhóm (Người phụ trách chính) thực hiện phê duyệt tiến độ thành viên thay vì nhập thay!"
         )
 
+    now = datetime.now()
     assign.progress_pct = req.progress_pct
-    if req.evidence_file_url and is_user_lead:
-        # Trưởng nhóm nộp minh chứng tổng của nhóm (hoặc cá nhân nộp minh chứng việc cá nhân)
-        lead_assign = db.query(TaskAssignment).filter_by(task_id=task_id, lecturer_id=user.id).first() or assign
-        lead_assign.latest_evidence_name = req.evidence_file_name or "File minh chứng"
-        lead_assign.latest_evidence_url = req.evidence_file_url
-        lead_assign.member_evidence_status = "Minh chứng chính thức của Nhóm" if is_group else "Đã nộp minh chứng"
+    assign.self_updated_at = now
 
-    if (is_user_lead or is_reviewer_or_mgr) and assign.latest_evidence_url:
-        if assign.member_evidence_status == "Đã gửi Trưởng nhóm":
-            assign.member_evidence_status = "Đã xác nhận"
+    if req.evidence_file_url:
+        assign.latest_evidence_name = req.evidence_file_name or "File minh chứng"
+        assign.latest_evidence_url = req.evidence_file_url
+        assign.member_evidence_status = (
+            "Minh chứng chính thức của Nhóm" if (is_group and is_user_lead) else "Đã gửi Trưởng nhóm"
+        )
+
+    if is_group:
+        assign.lead_approval_status = "Trưởng nhóm đã duyệt" if is_user_lead else "Chờ Trưởng nhóm duyệt"
+        if not is_user_lead:
+            task.lead_approval_status = "Chờ Trưởng nhóm duyệt"
+    else:
+        assign.lead_approval_status = "Trưởng nhóm đã duyệt"
 
     if assign.progress_pct > 0 and assign.status == ST_NEW:
         assign.status = ST_DOING
-        assign.task.status = ST_DOING
+        if task.status == ST_NEW:
+            task.status = ST_DOING
 
-    now = datetime.now()
     if assign.progress_pct == 100:
         assign.status = ST_DONE
         assign.completed_at = now
@@ -1041,40 +1033,218 @@ def update_progress(
             p.actual_is_late = assign.is_late
             p.resolved_at = now
 
-        all_done = all(a.status == ST_DONE for a in assign.task.assignments)
-        if all_done:
-            assign.task.status = ST_DONE
+    # HỆ THỐNG TỰ ĐỘNG TÍNH TOÁN % TIẾN ĐỘ DỰ ÁN DỰA TRÊN TIẾN ĐỘ CỦA CÁC THÀNH VIÊN (VD: 3 NGƯỜI)
+    calculated_project_pct = calculate_project_progress_from_assignments(task.assignments)
+    task.progress_pct = calculated_project_pct
+    if calculated_project_pct > 0 and task.status == ST_NEW:
+        task.status = ST_DOING
 
     prog = ProgressUpdate(
         assignment_id=assign.id,
         progress_pct=req.progress_pct,
         note=req.note,
-        evidence_file_name=req.evidence_file_name if is_user_lead else None,
-        evidence_file_url=req.evidence_file_url if is_user_lead else None,
+        evidence_file_name=req.evidence_file_name,
+        evidence_file_url=req.evidence_file_url,
         created_by=user.id,
         created_at=now
     )
     db.add(prog)
 
-    # Nếu Người kiểm tra hoặc Trưởng nhóm cập nhật tiến độ kèm ghi chú nhắc nhở cho thành viên thì gửi thông báo
-    if assign.lecturer_id != user.id and req.note:
+    db.add(TaskApprovalLog(
+        task_id=task.id,
+        assignment_id=assign.id,
+        actor_user_id=user.id,
+        actor_role="GROUP_LEAD" if is_user_lead else "LECTURER_MEMBER",
+        action_type="MEMBER_SELF_UPDATE_PROGRESS",
+        member_progress_pct=req.progress_pct,
+        calculated_project_pct=calculated_project_pct,
+        approval_status=assign.lead_approval_status,
+        note=req.note or f"Giảng viên tự cập nhật tiến độ cá nhân {req.progress_pct}%. Hệ thống tự tính tiến độ dự án = {calculated_project_pct}%.",
+        created_at=now
+    ))
+
+    if is_group and task.lead_lecturer_id and task.lead_lecturer_id != user.id:
         db.add(Notification(
-            user_id=assign.lecturer_id,
+            user_id=task.lead_lecturer_id,
             kind="new_task",
-            title=f"Cập nhật tiến độ [{task.code}] ({req.progress_pct}%)",
-            content=f"{user.full_name} đã cập nhật tiến độ phần việc của bạn trong '{task.title}' lên {req.progress_pct}%. Nhận xét: {req.note}",
+            title=f"Thành viên tự cập nhật tiến độ [{task.code}]: {assign.progress_pct}%",
+            content=(
+                f"Giảng viên {user.full_name} vừa tự cập nhật tiến độ cá nhân đạt {assign.progress_pct}%. "
+                f"Tiến độ dự án tự động tính từ {len(task.assignments)} thành viên hiện là {calculated_project_pct}%. "
+                f"Đề nghị Trưởng nhóm xem xét phê duyệt."
+            ),
             task_id=task.id,
-            dedupe_key=f"prog_upd:{task.id}:{assign.lecturer_id}:{uuid.uuid4().hex[:6]}"
+            dedupe_key=f"self_prog:{task.id}:{user.id}:{uuid.uuid4().hex[:6]}"
         ))
 
     db.commit()
     return {
-        "message": f"Đã cập nhật tiến độ cho {assign.lecturer.full_name} đạt {assign.progress_pct}%",
+        "message": (
+            f"Đã tự cập nhật tiến độ cá nhân đạt {assign.progress_pct}%. "
+            f"Hệ thống tự động tính tiến độ chung dự án ({len(task.assignments)} thành viên) đạt {calculated_project_pct}%!"
+        ),
         "progress_pct": assign.progress_pct,
+        "project_progress_pct": calculated_project_pct,
+        "lead_approval_status": assign.lead_approval_status,
         "status": assign.status,
         "evidence_file_name": assign.latest_evidence_name,
         "evidence_file_url": assign.latest_evidence_url,
         "member_evidence_status": assign.member_evidence_status
+    }
+
+
+@router.post("/{task_id}/lead-approve")
+def lead_approve_group_progress(
+    task_id: int,
+    req: LeadGroupApproveRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user)
+):
+    """
+    Trưởng nhóm (Người phụ trách chính) phê duyệt tiến độ tự cập nhật của từng thành viên,
+    sau đó gửi lên hệ thống tự động tính toán % tiến độ dự án dựa trên 3 người và trình Người kiểm tra.
+    """
+    task = db.get(Task, task_id)
+    if not task:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Không tìm thấy công việc")
+
+    my_assign = db.query(TaskAssignment).filter_by(task_id=task_id, lecturer_id=user.id).first()
+    is_user_lead = bool((task.lead_lecturer_id == user.id) or (my_assign and my_assign.is_lead) or user.role == ROLE_ADMIN)
+    if not is_user_lead:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Chỉ Trưởng nhóm (Người phụ trách chính) mới có quyền phê duyệt tiến độ của các thành viên trong nhóm!"
+        )
+
+    now = datetime.now()
+    for item in req.member_approvals:
+        member_assign = db.query(TaskAssignment).filter_by(task_id=task_id, lecturer_id=item.lecturer_id).first()
+        if member_assign:
+            member_assign.lead_approval_status = item.approval_status
+            member_assign.lead_approved_by = user.id
+            member_assign.lead_approved_at = now
+            if item.review_note:
+                member_assign.review_feedback = f"[Trưởng nhóm - {user.full_name}]: {item.review_note}"
+            if item.approval_status == "Trưởng nhóm đã duyệt":
+                member_assign.member_evidence_status = "Đã xác nhận"
+            elif item.approval_status == "Yêu cầu chỉnh sửa":
+                member_assign.member_evidence_status = "Cần bổ sung"
+
+    # Hệ thống tự động tính toán tiến độ chung của dự án dựa trên 3 thành viên
+    calculated_project_pct = calculate_project_progress_from_assignments(task.assignments)
+    task.progress_pct = calculated_project_pct
+
+    all_approved = all(a.lead_approval_status == "Trưởng nhóm đã duyệt" for a in task.assignments)
+    if req.submit_to_reviewer and all_approved:
+        task.lead_approval_status = "Đã duyệt & Trình Người kiểm tra"
+        task.lead_submitted_at = now
+        task.lead_decision_note = req.lead_decision_note or f"Đã phê duyệt tiến độ {len(task.assignments)} thành viên (Tiến độ dự án tự tính: {calculated_project_pct}%)."
+        task.reviewer_approval_status = "Chờ Người kiểm tra duyệt"
+        if task.reviewer_id:
+            db.add(Notification(
+                user_id=task.reviewer_id,
+                kind="new_task",
+                title=f"Trưởng nhóm trình duyệt tiến độ [{task.code}] ({calculated_project_pct}%)",
+                content=(
+                    f"Trưởng nhóm {user.full_name} đã phê duyệt tiến độ của {len(task.assignments)} thành viên "
+                    f"(Hệ thống tự tính tiến độ dự án = {calculated_project_pct}%) và trình Người kiểm tra phê duyệt."
+                ),
+                task_id=task.id,
+                dedupe_key=f"lead_sub:{task.id}:{uuid.uuid4().hex[:6]}"
+            ))
+    else:
+        task.lead_approval_status = "Yêu cầu thành viên chỉnh sửa" if not all_approved else "Đã duyệt & Trình Người kiểm tra"
+        task.lead_decision_note = req.lead_decision_note
+
+    db.add(TaskApprovalLog(
+        task_id=task.id,
+        assignment_id=my_assign.id if my_assign else None,
+        actor_user_id=user.id,
+        actor_role="GROUP_LEAD",
+        action_type="LEAD_SUBMIT_GROUP_DECISION",
+        calculated_project_pct=calculated_project_pct,
+        approval_status=task.lead_approval_status,
+        note=task.lead_decision_note,
+        created_at=now
+    ))
+
+    db.commit()
+    return {
+        "message": (
+            f"Trưởng nhóm đã phê duyệt! Hệ thống tự động tính tiến độ dự án từ {len(task.assignments)} thành viên = {calculated_project_pct}% "
+            f"và gửi lên Người kiểm tra."
+        ),
+        "project_progress_pct": calculated_project_pct,
+        "lead_approval_status": task.lead_approval_status,
+        "reviewer_approval_status": task.reviewer_approval_status
+    }
+
+
+@router.post("/{task_id}/reviewer-approve")
+def reviewer_approve_lead_decision(
+    task_id: int,
+    req: ReviewerApproveLeadRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user)
+):
+    """
+    Người kiểm tra quan sát tiến độ từng thành viên và phê duyệt quyết định của Trưởng nhóm.
+    """
+    task = db.get(Task, task_id)
+    if not task:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Không tìm thấy công việc")
+
+    is_reviewer = bool(task.reviewer_id == user.id or user.role in (ROLE_MANAGER, ROLE_ADMIN))
+    if not is_reviewer:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Chỉ Người kiểm tra được phân công mới có quyền phê duyệt quyết định của Trưởng nhóm!"
+        )
+
+    now = datetime.now()
+    calculated_project_pct = calculate_project_progress_from_assignments(task.assignments)
+    task.progress_pct = calculated_project_pct
+    task.reviewer_approval_status = req.approval_status
+    task.reviewer_decision_note = req.reviewer_decision_note
+    task.reviewer_approved_at = now
+
+    if req.approval_status == "Đã phê duyệt quyết định Trưởng nhóm":
+        if calculated_project_pct >= 100:
+            task.status = ST_DONE
+    else:
+        task.lead_approval_status = "Chờ Trưởng nhóm duyệt"
+
+    db.add(TaskApprovalLog(
+        task_id=task.id,
+        actor_user_id=user.id,
+        actor_role="TASK_REVIEWER",
+        action_type=(
+            "REVIEWER_APPROVE_LEAD_DECISION"
+            if req.approval_status == "Đã phê duyệt quyết định Trưởng nhóm"
+            else "REVIEWER_REJECT_LEAD_DECISION"
+        ),
+        calculated_project_pct=calculated_project_pct,
+        approval_status=req.approval_status,
+        note=req.reviewer_decision_note,
+        created_at=now
+    ))
+
+    if task.lead_lecturer_id:
+        db.add(Notification(
+            user_id=task.lead_lecturer_id,
+            kind="new_task",
+            title=f"Kết quả kiểm tra [{task.code}]: {req.approval_status}",
+            content=f"Người kiểm tra {user.full_name} đã xử lý quyết định của Trưởng nhóm ({calculated_project_pct}%): {req.approval_status}. Ghi chú: {req.reviewer_decision_note or 'Không có'}",
+            task_id=task.id,
+            dedupe_key=f"rev_app:{task.id}:{uuid.uuid4().hex[:6]}"
+        ))
+
+    db.commit()
+    return {
+        "message": f"Người kiểm tra đã xác nhận: {req.approval_status} (Tiến độ dự án: {calculated_project_pct}%)",
+        "project_progress_pct": calculated_project_pct,
+        "reviewer_approval_status": task.reviewer_approval_status,
+        "status": task.status
     }
 
 
@@ -1140,6 +1310,11 @@ def review_extension(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Yêu cầu gia hạn không hợp lệ hoặc đã xử lý")
 
     task = ext.task
+    if user.role == ROLE_MANAGER and user.department_id is not None and not is_task_in_manager_department_scope(user, task):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Phân quyền CSDL (RBAC): Trưởng Bộ môn chỉ quản lý và duyệt gia hạn cho các công việc thuộc Bộ môn đó của Khoa!"
+        )
     if user.role not in (ROLE_MANAGER, ROLE_ADMIN) and task.reviewer_id != user.id and task.created_by != user.id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Chỉ Quản lý hoặc Người kiểm tra tiến độ của công việc này mới có quyền duyệt gia hạn")
 

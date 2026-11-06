@@ -47,142 +47,173 @@ ROLE_DEFINITIONS = [
 
 PERMISSIONS_CATALOG = [
     (
-        "USER_MANAGE",
-        "Quản trị Hệ thống",
-        "Quản lý tài khoản & phân quyền",
-        "Thêm mới, cập nhật vai trò/bộ môn, khóa/mở khóa hoặc xóa tài khoản người dùng.",
-    ),
-    (
-        "ACCOUNT_DIRECTORY_VIEW",
-        "Quản trị Hệ thống",
-        "Xem danh bạ tài khoản toàn hệ thống",
-        "Tra cứu danh bạ tài khoản, trạng thái trực tuyến và phạm vi phân quyền của toàn bộ người dùng.",
+        "TASK_VIEW",
+        "tasks",
+        "Xem danh sách và chi tiết công việc theo phạm vi",
+        "Xem danh sách và chi tiết công việc theo phạm vi dữ liệu (SYSTEM / FACULTY / DEPARTMENT / SELF).",
     ),
     (
         "TASK_CREATE",
-        "Quản lý Công việc",
-        "Khởi tạo & giao công việc mới",
-        "Tạo đầu việc mới (cấp Bộ môn, Khoa, Trường) và thiết lập hạn hoàn thành, mức ưu tiên, độ phức tạp.",
+        "tasks",
+        "Tạo đầu việc mới trong Khoa/Bộ môn",
+        "Khởi tạo đầu việc mới trong phạm vi Toàn Khoa (Admin/Trưởng Khoa) hoặc cấp Bộ môn (Trưởng Bộ môn).",
     ),
     (
-        "TASK_ASSIGN_GROUP",
-        "Quản lý Công việc",
-        "Phân công việc nhóm & chỉ định Trưởng nhóm",
-        "Phân công công việc cho nhiều giảng viên, chỉ định Trưởng nhóm (Lead) và Người kiểm tra duyệt (Reviewer).",
+        "TASK_UPDATE",
+        "tasks",
+        "Chỉnh sửa thông tin công việc và hạn chót",
+        "Cập nhật thông tin công việc, mức ưu tiên, độ phức tạp và thời hạn hoàn thành.",
     ),
     (
-        "TASK_VIEW_FACULTY",
-        "Quản lý Công việc",
-        "Giám sát công việc phạm vi Toàn Khoa",
-        "Xem, lọc và giám sát tiến độ công việc của tất cả các Bộ môn trong Khoa CNTT.",
+        "TASK_DELETE",
+        "tasks",
+        "Xóa hoặc hủy bỏ công việc",
+        "Xóa hoặc hủy bỏ công việc thuộc thẩm quyền quản lý.",
     ),
     (
-        "TASK_VIEW_DEPARTMENT",
-        "Quản lý Công việc",
-        "Giám sát công việc phạm vi Bộ môn",
-        "Xem, lọc và giám sát tiến độ công việc của các giảng viên thuộc Bộ môn phụ trách.",
-    ),
-    (
-        "TASK_VIEW_SELF",
-        "Quản lý Công việc",
-        "Xem công việc cá nhân & nhóm tham gia",
-        "Xem chi tiết các công việc được giao cho bản thân hoặc nhóm công tác mà giảng viên là thành viên.",
+        "TASK_ASSIGN",
+        "tasks",
+        "Phân công giảng viên và chỉ định Trưởng nhóm",
+        "Phân công giảng viên thực hiện cá nhân hoặc theo nhóm và chỉ định duy nhất 1 Trưởng nhóm phụ trách chính.",
     ),
     (
         "TASK_UPDATE_PROGRESS",
-        "Thực hiện Công việc",
-        "Cập nhật tiến độ & nộp minh chứng",
-        "Cập nhật phần trăm tiến độ (0-100%), ghi chú thực hiện và đính kèm tệp/liên kết minh chứng hoàn thành.",
+        "tasks",
+        "Cập nhật tiến độ, nộp minh chứng và điều phối nhóm",
+        "Giảng viên tự cập nhật % tiến độ cá nhân, nộp minh chứng; Trưởng nhóm duyệt nội bộ để hệ thống tự tính % tiến độ dự án.",
     ),
     (
-        "EXTENSION_REQUEST",
-        "Gia hạn & Phê duyệt",
-        "Gửi yêu cầu xin gia hạn thời gian",
-        "Tạo đề xuất xin gia hạn hạn hoàn thành công việc kèm lý do giải trình khi gặp vướng mắc.",
+        "TASK_APPROVE",
+        "tasks",
+        "Nghiệm thu hoàn thành hoặc duyệt gia hạn",
+        "Người kiểm tra / Cấp quản lý nghiệm thu quyết định của Trưởng nhóm hoặc phê duyệt yêu cầu gia hạn.",
     ),
     (
-        "EXTENSION_APPROVE",
-        "Gia hạn & Phê duyệt",
-        "Phê duyệt / Từ chối yêu cầu gia hạn",
-        "Xem xét lý do, đối chiếu cảnh báo rủi ro ML và quyết định Duyệt hoặc Từ chối gia hạn.",
+        "TASK_COMMENT",
+        "tasks",
+        "Gửi ghi chú trao đổi và xem nhật ký tiến độ",
+        "Gửi nhận xét, thông báo nhắc nhở thiếu sót và tra cứu nhật ký cập nhật tiến độ.",
     ),
     (
-        "PLAN_IMPORT_EXPORT",
-        "Kế hoạch & Định mức",
-        "Nhập / Xuất kế hoạch công tác năm (Excel)",
-        "Tải biểu mẫu chuẩn và nhập hàng loạt kế hoạch công việc năm học từ tệp Excel vào hệ thống.",
+        "PLAN_VIEW",
+        "plans",
+        "Xem kế hoạch năm học và định mức 270 giờ chuẩn",
+        "Tra cứu kế hoạch công tác năm học và theo dõi lũy kế định mức 270 giờ chuẩn theo Thông tư 20/2020/TT-BGDĐT.",
     ),
     (
-        "NORM_CATALOG_MANAGE",
-        "Kế hoạch & Định mức",
-        "Quản lý danh mục công việc & định mức giờ chuẩn",
-        "Cấu hình danh mục 35 loại công việc cấp Khoa, danh mục cấp Trường (FR-06) và khung giờ chuẩn quy đổi.",
+        "PLAN_MANAGE",
+        "plans",
+        "Quản lý kế hoạch năm, xuất/nhập báo cáo Excel",
+        "Tải biểu mẫu chuẩn 16 cột, nhập hàng loạt kế hoạch năm từ tệp Excel và xuất báo cáo tổng hợp.",
     ),
     (
-        "ML_RISK_VIEW",
-        "Dự báo AI (TabPFN v2)",
-        "Xem dự báo xác suất rủi ro trễ hạn & giải thích SHAP",
-        "Xem xác suất trễ hạn, mức cảnh báo (Thấp/Trung bình/Cao) và các yếu tố tác động từ mô hình TabPFN v2.",
+        "USER_VIEW",
+        "users",
+        "Xem danh sách giảng viên và hồ sơ công tác 1 năm",
+        "Xem danh sách cán bộ giảng viên và tra cứu hồ sơ đánh giá công tác 1 năm.",
     ),
     (
-        "ML_MODEL_RETRAIN",
-        "Dự báo AI (TabPFN v2)",
-        "Kiểm định rào chắn & Huấn luyện tiếp mô hình ML",
-        "Kích hoạt quy trình học tiếp (Continual Learning) qua 3 rào chắn kiểm định và cập nhật kho phiên bản.",
+        "USER_MANAGE",
+        "users",
+        "Thêm/sửa/khóa tài khoản và cấu hình phân quyền RBAC",
+        "Đặc quyền Quản trị viên Hệ thống (Admin): Thêm mới, chỉnh sửa, khóa/mở khóa, xóa tài khoản và cấu hình phân quyền RBAC.",
     ),
     (
-        "REPORT_EXPORT",
-        "Thống kê & Báo cáo",
-        "Xem thống kê KPI & Xuất báo cáo Excel",
-        "Xem biểu đồ thống kê thực tế, đối chiếu dự báo - thực tế và xuất báo cáo tổng hợp ra Excel.",
+        "DEPT_MANAGE",
+        "departments",
+        "Quản lý danh mục Bộ môn và cấu hình hệ thống",
+        "Đặc quyền Quản trị viên Hệ thống (Admin): Quản lý danh mục các Bộ môn chuyên môn, danh mục cấp Trường và cấu hình hệ thống.",
+    ),
+    (
+        "ML_PREDICT_VIEW",
+        "ml",
+        "Xem dự báo xác suất trễ hạn và giải thích TabPFN v2",
+        "Xem xác suất rủi ro trễ hạn, mức cảnh báo (Thấp/Trung bình/Cao) và giải thích nhân quả từ mô hình TabPFN v2.",
+    ),
+    (
+        "ML_RECOMMEND_USE",
+        "ml",
+        "Sử dụng gợi ý phân công AI & Quản trị mô hình MLOps",
+        "Sử dụng bảng xếp hạng gợi ý phân công AI, đề xuất Trưởng nhóm và vận hành tái huấn luyện định kỳ MLOps.",
     ),
 ]
 
+# Ma trận 32 ánh xạ quyền chuẩn Bảng 3.4 Khóa luận (Admin: 15 quyền, Manager: 12 quyền, Lecturer: 5 quyền)
 ROLE_PERMISSION_MATRIX = {
     ROLE_ADMIN: [
-        ("USER_MANAGE", "Toàn quyền thêm/sửa/khóa/xóa tài khoản trên toàn hệ thống"),
-        ("ACCOUNT_DIRECTORY_VIEW", "Xem danh bạ toàn bộ 16+ tài khoản Quản trị, Quản lý và Giảng viên"),
-        ("TASK_CREATE", "Khởi tạo công việc ở mọi cấp (Trường / Khoa / Bộ môn)"),
-        ("TASK_ASSIGN_GROUP", "Phân công cá nhân hoặc nhóm cho mọi Bộ môn trong Khoa"),
-        ("TASK_VIEW_FACULTY", "Truy cập không giới hạn toàn bộ công việc của 24 Bộ môn"),
-        ("TASK_VIEW_DEPARTMENT", "Truy cập chi tiết từng Bộ môn K01..K24"),
-        ("TASK_VIEW_SELF", "Xem công việc liên quan trực tiếp"),
-        ("TASK_UPDATE_PROGRESS", "Can thiệp/cập nhật trạng thái và tiến độ khi cần hỗ trợ kỹ thuật"),
-        ("EXTENSION_REQUEST", "Tạo phiếu gia hạn thử nghiệm hoặc hỗ trợ"),
-        ("EXTENSION_APPROVE", "Phê duyệt hoặc từ chối mọi yêu cầu gia hạn trên hệ thống"),
-        ("PLAN_IMPORT_EXPORT", "Nhập và xuất kế hoạch công tác năm cho mọi giảng viên"),
-        ("NORM_CATALOG_MANAGE", "Thêm/sửa/xóa danh mục công việc cấp Trường và định mức giờ chuẩn"),
-        ("ML_RISK_VIEW", "Xem toàn bộ lịch sử dự báo rủi ro trễ hạn TabPFN v2 và độ lệch chuẩn"),
-        ("ML_MODEL_RETRAIN", "Chạy kiểm định 3 rào chắn và huấn luyện tiếp mô hình TabPFN v2"),
-        ("REPORT_EXPORT", "Xuất báo cáo tổng hợp toàn Khoa CNTT"),
+        ("TASK_VIEW", "Xem danh sách và chi tiết toàn bộ công việc trên hệ thống (SYSTEM)"),
+        ("TASK_CREATE", "Tạo đầu việc mới ở mọi cấp Trường / Khoa / Bộ môn"),
+        ("TASK_UPDATE", "Chỉnh sửa thông tin công việc và hạn chót trên toàn hệ thống"),
+        ("TASK_DELETE", "Xóa hoặc hủy bỏ công việc trên toàn hệ thống"),
+        ("TASK_ASSIGN", "Phân công giảng viên và chỉ định Trưởng nhóm cho mọi Bộ môn"),
+        ("TASK_UPDATE_PROGRESS", "Can thiệp cập nhật tiến độ, nộp minh chứng và điều phối nhóm"),
+        ("TASK_APPROVE", "Nghiệm thu hoàn thành hoặc phê duyệt mọi yêu cầu gia hạn"),
+        ("TASK_COMMENT", "Gửi ghi chú trao đổi và xem toàn bộ nhật ký tiến độ"),
+        ("PLAN_VIEW", "Xem kế hoạch năm học và định mức 270 giờ chuẩn toàn Khoa"),
+        ("PLAN_MANAGE", "Quản lý kế hoạch năm, định mức giờ chuẩn và xuất/nhập báo cáo Excel"),
+        ("USER_VIEW", "Xem danh sách toàn bộ 18 tài khoản và hồ sơ công tác 1 năm"),
+        ("USER_MANAGE", "Toàn quyền thêm/sửa/khóa/xóa tài khoản và cấu hình phân quyền RBAC"),
+        ("DEPT_MANAGE", "Quản lý danh mục Bộ môn, danh mục cấp Trường và cấu hình hệ thống"),
+        ("ML_PREDICT_VIEW", "Xem dự báo xác suất trễ hạn và giải thích TabPFN v2 toàn hệ thống"),
+        ("ML_RECOMMEND_USE", "Sử dụng gợi ý phân công AI & Quản trị tái huấn luyện mô hình MLOps"),
     ],
     ROLE_MANAGER: [
-        ("USER_MANAGE", "Quản lý thông tin giảng viên trong phạm vi Khoa/Bộ môn"),
-        ("TASK_CREATE", "Giao công việc mới trong phạm vi Toàn Khoa (Trưởng Khoa) hoặc Bộ môn (TBM)"),
-        ("TASK_ASSIGN_GROUP", "Phân công việc nhóm, chỉ định Trưởng nhóm và Người duyệt"),
-        ("TASK_VIEW_FACULTY", "Áp dụng khi department_id IS NULL (Trưởng Khoa / Phó Trưởng Khoa)"),
-        ("TASK_VIEW_DEPARTMENT", "Áp dụng khi gắn department_id cụ thể (Trưởng/Phó Bộ môn K01..K04)"),
-        ("TASK_VIEW_SELF", "Xem công việc do mình tạo, kiểm tra hoặc trực tiếp thực hiện"),
-        ("TASK_UPDATE_PROGRESS", "Cập nhật tiến độ và duyệt minh chứng của thành viên nhóm"),
-        ("EXTENSION_APPROVE", "Phê duyệt / Từ chối yêu cầu gia hạn của giảng viên thuộc phạm vi quản lý"),
-        ("PLAN_IMPORT_EXPORT", "Nhập/xuất kế hoạch công việc năm học từ file Excel"),
-        ("NORM_CATALOG_MANAGE", "Cấu hình danh mục công việc cấp Trường và ánh xạ giờ chuẩn"),
-        ("ML_RISK_VIEW", "Xem cảnh báo sớm rủi ro trễ hạn TabPFN v2 khi giao việc và duyệt gia hạn"),
-        ("ML_MODEL_RETRAIN", "Kích hoạt huấn luyện lại mô hình từ dữ liệu công việc hoàn thành thực tế"),
-        ("REPORT_EXPORT", "Xem Dashboard quản lý và xuất báo cáo Excel theo phạm vi Khoa/Bộ môn"),
+        ("TASK_VIEW", "Xem công việc Toàn Khoa (Trưởng Khoa - FACULTY) hoặc chỉ thuộc Bộ môn mình phụ trách (Trưởng Bộ môn - DEPARTMENT) & xem % tiến độ chung"),
+        ("TASK_CREATE", "Tạo đầu việc mới trong phạm vi Khoa (Trưởng Khoa) hoặc Bộ môn phụ trách (Trưởng Bộ môn)"),
+        ("TASK_UPDATE", "Chỉnh sửa thông tin công việc và hạn chót trong phạm vi quản lý"),
+        ("TASK_DELETE", "Xóa hoặc hủy bỏ công việc trong phạm vi Khoa/Bộ môn quản lý"),
+        ("TASK_ASSIGN", "Phân công giảng viên và chỉ định Trưởng nhóm trong phạm vi Khoa/Bộ môn"),
+        ("TASK_APPROVE", "Nghiệm thu hoàn thành hoặc duyệt gia hạn trong phạm vi Khoa/Bộ môn"),
+        ("TASK_COMMENT", "Gửi ghi chú trao đổi và xem nhật ký tiến độ công việc"),
+        ("PLAN_VIEW", "Xem kế hoạch năm học và định mức 270 giờ chuẩn theo phạm vi quản lý"),
+        ("PLAN_MANAGE", "Quản lý kế hoạch năm, xuất/nhập báo cáo Excel theo phạm vi Khoa/Bộ môn"),
+        ("USER_VIEW", "Xem danh sách giảng viên và hồ sơ công tác 1 năm trong phạm vi quản lý"),
+        ("ML_PREDICT_VIEW", "Xem dự báo xác suất trễ hạn và giải thích TabPFN v2"),
+        ("ML_RECOMMEND_USE", "Sử dụng gợi ý phân công AI & giám sát mô hình MLOps"),
     ],
     ROLE_LECTURER: [
-        ("TASK_VIEW_SELF", "Chỉ xem công việc được giao cho cá nhân hoặc nhóm mà mình tham gia (lecturer_scope=[user.id])"),
-        ("TASK_UPDATE_PROGRESS", "Cập nhật % tiến độ, nộp minh chứng; nếu là Trưởng nhóm được xác nhận minh chứng thành viên"),
-        ("EXTENSION_REQUEST", "Gửi yêu cầu xin gia hạn kèm lý do khi công việc chưa hoàn thành"),
-        ("ML_RISK_VIEW", "Xem đối chiếu kết quả thực tế với dự báo AI sau khi công việc đã hoàn thành"),
-        ("REPORT_EXPORT", "Xem thống kê giờ chuẩn quy đổi (Định mức 270 giờ chuẩn/năm) của cá nhân"),
+        ("TASK_VIEW", "Xem danh sách và chi tiết công việc cá nhân hoặc nhóm tham gia (SELF)"),
+        ("TASK_UPDATE_PROGRESS", "Giảng viên tự cập nhật % tiến độ cá nhân, nộp minh chứng; Trưởng nhóm phê duyệt thành viên để hệ thống tự tính % dự án"),
+        ("TASK_COMMENT", "Gửi ghi chú trao đổi và xem nhật ký tiến độ nhóm"),
+        ("PLAN_VIEW", "Xem kế hoạch năm học và định mức 270 giờ chuẩn cá nhân"),
+        ("USER_VIEW", "Xem thông tin giảng viên và hồ sơ công tác 1 năm của bản thân"),
     ],
 }
 
 
+def calculate_project_progress_from_assignments(assignments: list) -> int:
+    """Hệ thống tự động tính % tiến độ dự án dựa trên trung bình tiến độ của các thành viên trong nhóm (VD: 3 người)."""
+    if not assignments:
+        return 0
+    total = sum(max(0, min(100, int(getattr(a, "progress_pct", 0) or 0))) for a in assignments)
+    return int(round(total / len(assignments)))
+
+
+def is_task_in_manager_department_scope(user: User, task) -> bool:
+    """Kiểm tra Trưởng Bộ môn có quyền quản lý công việc này hay không:
+    - Admin hoặc Trưởng Khoa (user.department_id is None): Quản lý toàn bộ các Bộ môn của Khoa -> True.
+    - Trưởng Bộ môn (user.role == 'manager' and user.department_id is not None):
+      Chỉ quản lý được các công việc thuộc Bộ môn đó của Khoa (task.department_id == user.department_id
+      hoặc có thành viên trong nhóm thuộc Bộ môn đó).
+    """
+    if user.role == ROLE_ADMIN:
+        return True
+    if user.role == ROLE_MANAGER and user.department_id is None:
+        return True
+    if user.role == ROLE_MANAGER and user.department_id is not None:
+        task_dept_id = getattr(task, "department_id", None)
+        if task_dept_id is not None:
+            return int(task_dept_id) == int(user.department_id)
+        for a in getattr(task, "assignments", []) or []:
+            lec = getattr(a, "lecturer", None)
+            if lec and getattr(lec, "department_id", None) == user.department_id:
+                return True
+        return False
+    return False
+
+
 def ensure_rbac_catalog(db: Session) -> None:
-    """Đảm bảo các bảng roles, permissions, role_permissions và trigger ràng buộc role trong CSDL."""
+    """Đảm bảo các bảng roles, permissions, role_permissions và trigger tự động tính % tiến độ dự án trong CSDL."""
     try:
         bind = db.get_bind()
         if bind and bind.dialect.name == "sqlite":
@@ -204,6 +235,23 @@ def ensure_rbac_catalog(db: Session) -> None:
                     SELECT RAISE(ABORT, 'RBAC Constraint Violation: role must be admin, manager, or lecturer');
                 END;
             """))
+            db.execute(text("""
+                CREATE TRIGGER IF NOT EXISTS trg_auto_calc_task_progress_on_update
+                AFTER UPDATE OF progress_pct, lead_approval_status ON task_assignments
+                FOR EACH ROW
+                BEGIN
+                    UPDATE tasks
+                    SET progress_pct = COALESCE(
+                        (
+                            SELECT CAST(ROUND(AVG(CAST(ta.progress_pct AS REAL)), 0) AS INTEGER)
+                            FROM task_assignments ta
+                            WHERE ta.task_id = NEW.task_id
+                        ),
+                        0
+                    )
+                    WHERE id = NEW.task_id;
+                END;
+            """))
     except Exception:
         pass
 
@@ -218,6 +266,11 @@ def ensure_rbac_catalog(db: Session) -> None:
             role_obj.description = r_data["description"]
     db.flush()
 
+    valid_perm_codes = {code for code, _, _, _ in PERMISSIONS_CATALOG}
+    db.query(RolePermission).filter(~RolePermission.permission_code.in_(valid_perm_codes)).delete(synchronize_session=False)
+    db.query(Permission).filter(~Permission.code.in_(valid_perm_codes)).delete(synchronize_session=False)
+    db.flush()
+
     for code, module, name, desc in PERMISSIONS_CATALOG:
         perm_obj = db.get(Permission, code)
         if not perm_obj:
@@ -229,6 +282,11 @@ def ensure_rbac_catalog(db: Session) -> None:
     db.flush()
 
     for role_code, items in ROLE_PERMISSION_MATRIX.items():
+        valid_role_perms = {p[0] for p in items}
+        db.query(RolePermission).filter(
+            RolePermission.role_code == role_code,
+            ~RolePermission.permission_code.in_(valid_role_perms),
+        ).delete(synchronize_session=False)
         for perm_code, note in items:
             exists = (
                 db.query(RolePermission)
@@ -251,36 +309,30 @@ def ensure_rbac_catalog(db: Session) -> None:
 def sync_user_permission_scope(db: Session, user: User) -> UserPermissionScope:
     """Tính toán và lưu tường minh quyền hạn + ràng buộc phạm vi của 1 tài khoản vào bảng user_permission_scopes."""
     dept = db.get(Department, user.department_id) if user.department_id else None
-    dept_label = dept.name if dept else "Toàn Khoa CNTT (24 Bộ môn)"
+    dept_label = dept.name if dept else "Toàn Khoa CNTT (4 Bộ môn)"
 
     if user.role == ROLE_ADMIN:
         scope_level = SCOPE_SYSTEM
-        scope_desc = "Toàn hệ thống (System-wide) — Quản trị tài khoản, cấu hình danh mục & MLOps"
+        scope_desc = "Toàn hệ thống (SYSTEM • 15/15 quyền) — Quản trị 18 tài khoản, phân quyền RBAC, cấu hình danh mục Bộ môn & MLOps"
         perms = [p[0] for p in ROLE_PERMISSION_MATRIX[ROLE_ADMIN]]
-        rule_sql = "ALL_RECORDS (lecturer_scope = None, role = 'admin')"
+        rule_sql = "ALL_RECORDS (scope = 'SYSTEM', role = 'admin', 15/15 permissions)"
     elif user.role == ROLE_MANAGER:
+        perms = [p[0] for p in ROLE_PERMISSION_MATRIX[ROLE_MANAGER]]
         if user.department_id is None:
             scope_level = SCOPE_FACULTY
-            scope_desc = "Cấp Toàn Khoa CNTT — Giám sát, giao việc & duyệt gia hạn tất cả các Bộ môn"
-            perms = [
-                p[0] for p in ROLE_PERMISSION_MATRIX[ROLE_MANAGER]
-                if p[0] != "TASK_VIEW_DEPARTMENT"
-            ]
-            rule_sql = "FACULTY_WIDE (lecturer_scope = None, department_id IS NULL)"
+            scope_desc = "Cấp Toàn Khoa CNTT (FACULTY • 12/15 quyền) — Điều phối, giao việc & nghiệm thu xuyên suốt 4 Bộ môn"
+            rule_sql = "FACULTY_WIDE (scope = 'FACULTY', department_id IS NULL, 12/15 permissions)"
         else:
             scope_level = SCOPE_DEPARTMENT
-            scope_desc = f"Cấp Bộ môn ({dept_label}) — Quản lý giảng viên & công việc thuộc Bộ môn"
-            perms = [
-                p[0] for p in ROLE_PERMISSION_MATRIX[ROLE_MANAGER]
-                if p[0] != "TASK_VIEW_FACULTY"
-            ]
-            rule_sql = f"DEPARTMENT_ONLY (department_id = {user.department_id} [{dept.code if dept else ''}])"
+            scope_desc = f"Cấp Bộ môn ({dept_label} • DEPARTMENT • 12/15 quyền) — Chỉ quản lý công việc & nhân sự thuộc Bộ môn phụ trách"
+            rule_sql = f"DEPARTMENT_ONLY (scope = 'DEPARTMENT', department_id = {user.department_id} [{dept.code if dept else ''}], 12/15 permissions)"
     else:
         scope_level = SCOPE_SELF
-        scope_desc = f"Cá nhân & Nhóm công tác được giao ({dept_label})"
+        scope_desc = f"Cá nhân & Nhóm công tác được giao ({dept_label} • SELF • 5/15 quyền)"
         perms = [p[0] for p in ROLE_PERMISSION_MATRIX[ROLE_LECTURER]]
-        rule_sql = f"SELF_OR_GROUP_MEMBER (lecturer_id = {user.id} OR lead_lecturer_id = {user.id})"
+        rule_sql = f"SELF_OR_GROUP_MEMBER (scope = 'SELF', lecturer_id = {user.id} OR lead_lecturer_id = {user.id}, 5/15 permissions)"
 
+    is_admin = user.role == ROLE_ADMIN
     is_admin_or_mgr = user.role in (ROLE_ADMIN, ROLE_MANAGER)
     scope_row = db.get(UserPermissionScope, user.id)
     if not scope_row:
@@ -292,15 +344,15 @@ def sync_user_permission_scope(db: Session, user: User) -> UserPermissionScope:
     scope_row.scope_level = scope_level
     scope_row.department_id = user.department_id
     scope_row.scope_description = scope_desc
-    scope_row.can_manage_users = is_admin_or_mgr
+    scope_row.can_manage_users = is_admin
     scope_row.can_create_task = is_admin_or_mgr
     scope_row.can_assign_task = is_admin_or_mgr
     scope_row.can_approve_extension = is_admin_or_mgr
-    scope_row.can_manage_norm_catalog = is_admin_or_mgr
+    scope_row.can_manage_norm_catalog = is_admin
     scope_row.can_import_plan = is_admin_or_mgr
-    scope_row.can_view_ml_risk = True
+    scope_row.can_view_ml_risk = is_admin_or_mgr
     scope_row.can_retrain_ml_model = is_admin_or_mgr
-    scope_row.can_export_report = True
+    scope_row.can_export_report = is_admin_or_mgr
     scope_row.can_update_own_progress = True
     scope_row.can_request_extension = True
     scope_row.granted_permissions_json = json.dumps(perms, ensure_ascii=False)

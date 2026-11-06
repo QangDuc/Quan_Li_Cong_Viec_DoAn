@@ -1,4 +1,4 @@
-﻿task_id,lecturer_id,faculty,assigned_date,checkpoint_fraction,y,risk_probability
+task_id,lecturer_id,faculty,assigned_date,checkpoint_fraction,y,risk_probability
 T054260,GV330,K06,2026-12-30,0.5,1,0.06744
 T058457,GV357,K03,2026-12-30,0.25,0,0.03631
 T058457,GV044,K03,2026-12-30,0.5,0,0.10393

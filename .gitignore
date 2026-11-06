@@ -2,35 +2,54 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyd
 
-# Caches & checkpoints
+# Caches, checkpoints & logs
 .pytest_cache/
 checkpoint/
 *.tmp
 *.tmp.npy
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
-# Environments
+# Environments & virtualenvs
 .env
-.venv
+.venv/
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
 
-# Frontend build & dependencies
+# Node & Frontend build & dependencies
+node_modules/
 frontend/node_modules/
+dist/
 frontend/dist/
+build/
+.tmp/
+*.tsbuildinfo
+
+# AI tools, Skills, Agent artifacts & Temporary workspace files
+.aistudio/
+skills-lock.json
+.skills/
+system_instructions.txt
 
 # Playwright artifacts & screenshots
 .playwright-mcp/
 playwright_*.png
 
-# Local Word / PDF thesis documents & helper scripts (only track the official completed thesis document)
+# Documents & backup files (only track official completed thesis documents)
 *.docx
 *.doc
 *.pdf
 !docs/BAO_CAO_KLTN_CNTT_KLCN184_UNIFIED_UPDATED.docx
+!docs/Bao_Cao_KLTN.docx
+docs/backup_*
 ~$*
 backend/scripts/generated_diagrams/
 backend/scripts/build_graduation_thesis_docx.py
@@ -48,10 +67,11 @@ backend/uploads/evidence/*.pdf
 *.swp
 *.swo
 
-# Large raw archives
+# Large raw archives & zero-byte locks
 *.zip
 *.tar.gz
 *.rar
+bun.lock
 
 # OS files
 .DS_Store

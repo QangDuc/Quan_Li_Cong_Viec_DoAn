@@ -14,10 +14,7 @@ if exist "%~dp0.venv\Scripts\activate.bat" (
 
 echo [1/3] Kiem tra Co so Du lieu...
 cd /d "%~dp0backend"
-if not exist qlcv.db (
-    echo [Thong bao] Dang khoi tao database va nap du lieu mau...
-    python -m app.seed --reset
-)
+python -m app.seed
 
 echo [2/3] Khoi dong ML Service (Port 8001)...
 start "ML Service (Port 8001)" /D "%~dp0backend" cmd /k "call ..\.venv\Scripts\activate.bat && python -m uvicorn ml_service:app --host 127.0.0.1 --port 8001"

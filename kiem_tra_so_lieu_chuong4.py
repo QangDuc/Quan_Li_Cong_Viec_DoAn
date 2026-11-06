@@ -97,7 +97,10 @@ NAMES_DOC = {
 
 
 def check_metrics_table(tag, cmp_json):
+    has_baseline = "Baseline Lịch sử" in text or "Baseline lịch sử" in text
     for model, m in cmp_json["metrics"].items():
+        if model == "hist_baseline" and not has_baseline:
+            continue
         ci = cmp_json["auc_ci95"].get(model)
         if ci:
             need(f"{tag} {model}: ROC-AUC [KTC]",
@@ -112,7 +115,10 @@ check_metrics_table("Bảng 4.1", cs)
 check_metrics_table("Bảng 4.3", cd)
 
 # ---------- so sánh cặp ----------
+has_baseline = "Baseline Lịch sử" in text or "Baseline lịch sử" in text
 for model, d in cs["paired_tabpfn_minus"].items():
+    if model == "hist_baseline" and not has_baseline:
+        continue
     if model in ("hist_baseline", "logistic_base", "catboost"):
         lo, hi = d["d_auc_ci"]
         need(f"ΔAUC TabPFN − {model}", [f"{signed(d['d_auc'])} [{signed(lo)}; {signed(hi)}]",

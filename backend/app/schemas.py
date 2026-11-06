@@ -111,6 +111,20 @@ class TaskFeedbackRequest(BaseModel):
     status_action: Optional[str] = None
     progress_pct: Optional[float] = None
 
+class LeadMemberApprovalItem(BaseModel):
+    lecturer_id: int
+    approval_status: str = Field(..., description="Trưởng nhóm đã duyệt | Yêu cầu chỉnh sửa")
+    review_note: Optional[str] = None
+
+class LeadGroupApproveRequest(BaseModel):
+    member_approvals: List[LeadMemberApprovalItem]
+    submit_to_reviewer: bool = True
+    lead_decision_note: Optional[str] = None
+
+class ReviewerApproveLeadRequest(BaseModel):
+    approval_status: str = Field(..., description="Đã phê duyệt quyết định Trưởng nhóm | Yêu cầu Trưởng nhóm rà soát lại")
+    reviewer_decision_note: Optional[str] = None
+
 # --- School Catalog ---
 class SchoolCatalogCreate(BaseModel):
     code: str
@@ -118,3 +132,4 @@ class SchoolCatalogCreate(BaseModel):
     conversion_hours: float
     task_type_id: Optional[int] = None
     note: Optional[str] = None
+
